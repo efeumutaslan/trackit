@@ -1,0 +1,13 @@
+# TrackIt — Caddy reverse proxy config
+# Bu dosya sunucudaki Caddy'nin global Caddyfile'ına eklenecek
+# /etc/caddy/Caddyfile
+
+track-it.duckdns.org {
+    reverse_proxy localhost:3000
+
+    # Logs (opsiyonel)
+    log {
+        output file /var/log/caddy/trackit.log
+        format console
+    }
+}

@@ -1,0 +1,36 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import TopBar from '../components/TopBar.jsx';
+import { api } from '../lib/api.js';
+
+export default function Sessions() {
+  const [rows, setRows] = useState([]);
+  useEffect(() => { api.get('/sessions').then(setRows); }, []);
+  return (
+    <div className="app-shell">
+      <TopBar back title="Sessionlar" />
+      <div className="content">
+        <Link to="/log" className="btn primary mb-2">+ Yeni session</Link>
+        {rows.length === 0 ? (
+          <div className="empty">
+            <div className="icon">📋</div>
+            <div>Henüz session yok</div>
+          </div>
+        ) : (
+          rows.map((s) => (
+            <Link to={`/sessions/${s.id}`} key={s.id} className="list-row">
+              <div className="meta">
+                <span className="color-dot" style={{ background: s.template_color || 'var(--gray-soft)' }} />
+                <div>
+                  <div style={{ fontWeight: 600 }}>{s.template_name || 'Sessiz session'}</div>
+                  <div className="small text-muted">{s.session_date}</div>
+                </div>
+              </div>
+              <span style={{ color: 'var(--gray)' }}>›</span>
+            </Link>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
