@@ -223,8 +223,27 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
         <div className="text-center">REP</div>
         <div />
       </div>
-      {ex.sets.map((set) => (
-        <SetRow key={set.id} sessionId={sessionId} set={set} reload={reload} />
+      {ex.sets.map((set, idx) => (
+        <SetRow
+          key={set.id}
+          sessionId={sessionId}
+          set={set}
+          reload={reload}
+          onWeightFilled={async (weight) => {
+            // bu setten sonraki, weight_kg boş olan setlere aynı kg'yi yaz
+            const targets = ex.sets.slice(idx + 1).filter((s) => s.weight_kg == null || s.weight_kg === '');
+            if (targets.length === 0) return;
+            await Promise.all(
+              targets.map((s) =>
+                api.put(`/sessions/${sessionId}/sets/${s.id}`, {
+                  weight_kg: weight,
+                  reps_done: s.reps_done,
+                })
+              )
+            );
+            reload();
+          }}
+        />
       ))}
       <button className="btn ghost tiny mt-1" onClick={addSet}>+ Set ekle</button>
 
@@ -248,16 +267,24 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
   );
 }
 
-function SetRow({ sessionId, set, reload }) {
+function SetRow({ sessionId, set, reload, onWeightFilled }) {
   const [w, setW] = useState(set.weight_kg ?? '');
   const [r, setR] = useState(set.reps_done ?? '');
 
   async function save() {
+    const prevW = set.weight_kg;
+    const newW = w === '' ? null : +w;
     await api.put(`/sessions/${sessionId}/sets/${set.id}`, {
-      weight_kg: w === '' ? null : +w,
+      weight_kg: newW,
       reps_done: r === '' ? null : +r,
     });
-    reload();
+    // sadece kg yeni doldurulduğunda (önceden boş, şimdi dolu) cascade tetikle
+    const wasEmpty = prevW == null || prevW === '';
+    if (wasEmpty && newW != null && onWeightFilled) {
+      await onWeightFilled(newW);
+    } else {
+      reload();
+    }
   }
 
   async function del() {
