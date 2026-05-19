@@ -37,6 +37,23 @@ function loadSession(userId, sessionId) {
     WHERE ws.id = ? AND ws.user_id = ?
   `).get(sessionId, userId);
   if (!s) return null;
+
+  // Önceki workout notunu dinamik olarak çek (her zaman güncel)
+  if (s.template_id) {
+    const prevWN = db.prepare(`
+      SELECT workout_notes, session_date FROM workout_sessions
+      WHERE user_id = ? AND template_id = ?
+        AND session_date < ?
+        AND COALESCE(workout_notes,'') != ''
+      ORDER BY session_date DESC, id DESC LIMIT 1
+    `).get(userId, s.template_id, s.session_date);
+    s.prev_workout_notes = prevWN?.workout_notes || '';
+    s.prev_workout_notes_date = prevWN?.session_date || null;
+  } else {
+    s.prev_workout_notes = '';
+    s.prev_workout_notes_date = null;
+  }
+
   const exercises = db.prepare(`
     SELECT se.*, e.name AS exercise_name
     FROM session_exercises se
@@ -70,6 +87,18 @@ function loadSession(userId, sessionId) {
       ORDER BY ws.session_date DESC, ws.id DESC LIMIT 1
     `).get(userId, ex.exercise_id, s.session_date);
     ex.prev_tonnage = prev?.tonnage || 0;
+
+    // önceki exercise notunu dinamik çek
+    const prevExN = db.prepare(`
+      SELECT se.exercise_notes, ws.session_date FROM session_exercises se
+      JOIN workout_sessions ws ON ws.id = se.session_id
+      WHERE ws.user_id = ? AND se.exercise_id = ?
+        AND ws.session_date < ?
+        AND COALESCE(se.exercise_notes,'') != ''
+      ORDER BY ws.session_date DESC, ws.id DESC LIMIT 1
+    `).get(userId, ex.exercise_id, s.session_date);
+    ex.prev_exercise_notes = prevExN?.exercise_notes || '';
+    ex.prev_exercise_notes_date = prevExN?.session_date || null;
   }
   s.exercises = exercises;
   return s;

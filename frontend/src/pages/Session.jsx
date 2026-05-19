@@ -97,9 +97,15 @@ export default function Session() {
         </div>
 
         {s.prev_workout_notes && (
-          <div className="card compact" style={{ background: 'var(--peach-soft)' }}>
-            <div className="small" style={{ fontWeight: 700, color: 'var(--peach-dark)' }}>Önceki workout notu</div>
-            <div className="small" style={{ color: 'var(--ink-soft)' }}>{s.prev_workout_notes}</div>
+          <div className="prev-note-card">
+            <div className="prev-note-head">
+              <span className="prev-note-icon">📜</span>
+              <span className="prev-note-label">Önceki workout notu</span>
+              {s.prev_workout_notes_date && (
+                <span className="prev-note-date">{s.prev_workout_notes_date}</span>
+              )}
+            </div>
+            <div className="prev-note-body">{s.prev_workout_notes}</div>
           </div>
         )}
 
@@ -248,9 +254,15 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
       <button className="btn ghost tiny mt-1" onClick={addSet}>+ Set ekle</button>
 
       {ex.prev_exercise_notes && (
-        <div className="card compact mt-2" style={{ background: 'var(--peach-soft)', marginBottom: 0 }}>
-          <div className="small" style={{ fontWeight: 700, color: 'var(--peach-dark)' }}>Önceki notu</div>
-          <div className="small" style={{ color: 'var(--ink-soft)' }}>{ex.prev_exercise_notes}</div>
+        <div className="prev-note-card prev-note-card--sm mt-2">
+          <div className="prev-note-head">
+            <span className="prev-note-icon">📜</span>
+            <span className="prev-note-label">Önceki egzersiz notu</span>
+            {ex.prev_exercise_notes_date && (
+              <span className="prev-note-date">{ex.prev_exercise_notes_date}</span>
+            )}
+          </div>
+          <div className="prev-note-body">{ex.prev_exercise_notes}</div>
         </div>
       )}
 
