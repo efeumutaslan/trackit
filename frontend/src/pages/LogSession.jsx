@@ -44,20 +44,20 @@ export default function LogSession() {
 
   return (
     <div className="app-shell">
-      <TopBar back title="Antrenman kaydet" />
+      <TopBar back title="Log a workout" />
       <div className="content">
         <div className="field">
-          <label>Tarih</label>
+          <label>Date</label>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
 
-        <div className="section-title">Şablon seç</div>
+        <div className="section-title">Choose a template</div>
         {templates.length === 0 ? (
           <div className="empty">
             <div className="icon">📐</div>
-            <div>Henüz şablon yok.</div>
+            <div>No templates yet.</div>
             <Link to="/templates/new" className="btn ghost mt-2" style={{ display: 'inline-flex' }}>
-              + Yeni şablon ekle
+              + Add a new template
             </Link>
           </div>
         ) : (
@@ -68,7 +68,7 @@ export default function LogSession() {
                   <span className="color-dot" style={{ background: t.color }} />
                   <div>
                     <h3>{t.name}</h3>
-                    <div className="sub">{t.exercises?.length || 0} egzersiz</div>
+                    <div className="sub">{t.exercises?.length || 0} exercises</div>
                   </div>
                 </div>
                 <span style={{ color: 'var(--gray)' }}>›</span>
@@ -77,14 +77,14 @@ export default function LogSession() {
           ))
         )}
 
-        <div className="section-title">veya</div>
+        <div className="section-title">or</div>
         <button className="btn" onClick={startEmpty} disabled={busy}>
-          + Boş başla (egzersizleri tek tek ekle)
+          + Start blank (add exercises one by one)
         </button>
 
-        <div className="section-title">Yönetim</div>
-        <Link to="/templates/new" className="btn ghost">+ Yeni şablon ekle</Link>
-        <Link to="/exercises/new" className="btn ghost mt-1">+ Yeni egzersiz ekle</Link>
+        <div className="section-title">Manage</div>
+        <Link to="/templates/new" className="btn ghost">+ Add a new template</Link>
+        <Link to="/exercises/new" className="btn ghost mt-1">+ Add a new exercise</Link>
       </div>
     </div>
   );

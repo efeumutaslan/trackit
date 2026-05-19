@@ -32,7 +32,7 @@ export default function TemplateEdit() {
   }, [id, isNew]);
 
   async function save() {
-    if (!name.trim()) { alert('İsim gerekli'); return; }
+    if (!name.trim()) { alert('Name is required'); return; }
     const payload = {
       name: name.trim(),
       color,
@@ -54,7 +54,7 @@ export default function TemplateEdit() {
   }
 
   async function del() {
-    if (!confirm('Bu şablon silinsin mi? (Geçmiş sessionlar etkilenmez)')) return;
+    if (!confirm('Delete this template? (Past sessions are unaffected)')) return;
     await api.del(`/templates/${id}`);
     nav('/templates');
   }
@@ -92,29 +92,29 @@ export default function TemplateEdit() {
     <div className="app-shell">
       <TopBar
         back
-        title={isNew ? 'Yeni şablon' : 'Şablonu düzenle'}
-        right={!isNew && <button className="right-action" onClick={del} style={{ color: 'var(--red)' }}>Sil</button>}
+        title={isNew ? 'New template' : 'Edit template'}
+        right={!isNew && <button className="right-action" onClick={del} style={{ color: 'var(--red)' }}>Delete</button>}
       />
       <div className="content">
         <div className="card">
           <div className="field">
-            <label>Şablon adı</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="örn DAY 1 PUSH" />
+            <label>Template name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. DAY 1 PUSH" />
           </div>
           <div className="field" style={{ marginBottom: 0 }}>
-            <label>Renk</label>
+            <label>Color</label>
             <div className="color-picker">
               {COLORS.map((c) => (
                 <button key={c} className={color === c ? 'selected' : ''} style={{ background: c }} onClick={() => setColor(c)} />
               ))}
             </div>
-            <input className="mt-1" value={color} onChange={(e) => setColor(e.target.value)} placeholder="#hexkod" />
+            <input className="mt-1" value={color} onChange={(e) => setColor(e.target.value)} placeholder="#hex" />
           </div>
         </div>
 
-        <div className="section-title">Egzersizler</div>
+        <div className="section-title">Exercises</div>
         {exercises.length === 0 ? (
-          <div className="empty small">Henüz egzersiz yok</div>
+          <div className="empty small">No exercises yet</div>
         ) : (
           exercises.map((ex, idx) => (
             <div className="card compact" key={`${ex.exercise_id}-${idx}`}>
@@ -128,7 +128,7 @@ export default function TemplateEdit() {
               </div>
               <div className="row">
                 <div>
-                  <label className="small text-muted">Set</label>
+                  <label className="small text-muted">Sets</label>
                   <input type="number" value={ex.target_sets} onChange={(e) => {
                     const next = [...exercises];
                     next[idx] = { ...ex, target_sets: +e.target.value };
@@ -136,7 +136,7 @@ export default function TemplateEdit() {
                   }} />
                 </div>
                 <div>
-                  <label className="small text-muted">Rep</label>
+                  <label className="small text-muted">Reps</label>
                   <input value={ex.target_reps} onChange={(e) => {
                     const next = [...exercises];
                     next[idx] = { ...ex, target_reps: e.target.value };
@@ -148,8 +148,8 @@ export default function TemplateEdit() {
           ))
         )}
 
-        <button className="btn" onClick={() => setShowAdd(true)}>+ Egzersiz ekle</button>
-        <button className="btn primary mt-2" onClick={save}>Kaydet</button>
+        <button className="btn" onClick={() => setShowAdd(true)}>+ Add exercise</button>
+        <button className="btn primary mt-2" onClick={save}>Save</button>
 
         {showAdd && (
           <AddExerciseModal
@@ -173,12 +173,12 @@ function AddExerciseModal({ roster, existingIds, onAdd, onCreate, onClose }) {
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Egzersiz ekle</h3>
+        <h3>Add exercise</h3>
         <div className="field">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ara veya yeni yaz…" autoFocus />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search or type a new one…" autoFocus />
         </div>
         {filtered.length === 0 && q.trim() ? (
-          <button className="btn primary" onClick={() => onCreate(q)}>+ "{q}" oluştur ve ekle</button>
+          <button className="btn primary" onClick={() => onCreate(q)}>+ Create "{q}" and add</button>
         ) : (
           filtered.map((e) => (
             <div className="list-row" key={e.id} onClick={() => onAdd(e)}>
@@ -187,7 +187,7 @@ function AddExerciseModal({ roster, existingIds, onAdd, onCreate, onClose }) {
             </div>
           ))
         )}
-        <button className="btn ghost mt-2" onClick={onClose}>İptal</button>
+        <button className="btn ghost mt-2" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );

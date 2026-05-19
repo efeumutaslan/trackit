@@ -1,43 +1,43 @@
 #!/bin/bash
-# TrackIt — Güvenli Güncelleme (verileri korur)
-# Kullanım: ./upgrade.sh
+# TrackIt — Safe upgrade (preserves data)
+# Usage: ./upgrade.sh
 
 set -e
 
-echo "🏋️  TrackIt Güncelleme"
+echo "🏋️  TrackIt — Upgrade"
 echo ""
 
 BACKUP_DIR="$HOME/trackit-backups"
 mkdir -p "$BACKUP_DIR"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
-# DB yedeği
-echo "💾 Veritabanı yedekleniyor..."
+# DB backup
+echo "💾 Backing up database..."
 if docker compose ps app --status running &>/dev/null; then
   docker compose cp app:/app/data/trackit.db "$BACKUP_DIR/trackit_$TIMESTAMP.db" 2>/dev/null \
-    && echo "   ✅ Yedek: $BACKUP_DIR/trackit_$TIMESTAMP.db" \
-    || echo "   ⚠️  Yedek alınamadı (DB henüz oluşmamış olabilir)"
+    && echo "   ✅ Backup: $BACKUP_DIR/trackit_$TIMESTAMP.db" \
+    || echo "   ⚠️  Backup failed (DB may not exist yet)"
 else
-  echo "   ⚠️  App çalışmıyor — yedek atlandı"
+  echo "   ⚠️  App is not running — skipping backup"
 fi
 
 echo ""
-echo "⏹️  Container'lar durduruluyor (volume'lar korunuyor)..."
+echo "⏹️  Stopping containers (volumes preserved)..."
 docker compose down
 
-echo "🔨 Yeniden build ediliyor..."
+echo "🔨 Rebuilding..."
 docker compose up -d --build
 
 echo ""
-echo "⏳ Bekleniyor..."
+echo "⏳ Waiting..."
 sleep 6
 
 if curl -sf http://localhost:3000/api/health > /dev/null; then
-  echo "✅ TrackIt güncellendi: http://localhost:3000"
+  echo "✅ TrackIt upgraded: http://localhost:3000"
   echo ""
-  echo "📦 Yedekler: $BACKUP_DIR/"
+  echo "📦 Backups: $BACKUP_DIR/"
   ls -lh "$BACKUP_DIR/" 2>/dev/null | tail -5
 else
-  echo "⚠️  Sağlık kontrolü başarısız. Logları kontrol et:"
+  echo "⚠️  Health check failed. Inspect the logs:"
   echo "    docker compose logs -f"
 fi

@@ -40,7 +40,7 @@ export default function Calendar() {
     else setM(m + 1);
   }
 
-  const monthName = new Date(y, m - 1, 1).toLocaleString('tr-TR', { month: 'long', year: 'numeric' });
+  const monthName = new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   return (
     <div className="calendar">
@@ -50,7 +50,7 @@ export default function Calendar() {
         <button onClick={next}>›</button>
       </div>
       <div className="calendar-grid">
-        {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map((d) => (
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
           <div className="dow" key={d}>{d}</div>
         ))}
         {cells.map((d, i) => {

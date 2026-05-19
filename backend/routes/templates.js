@@ -17,7 +17,7 @@ function pickUnusedColor(userId) {
   );
   const fresh = PRESET_COLORS.find(c => !used.has(c));
   if (fresh) return fresh;
-  // hepsi kullanıldıysa random
+  // fall back to random if all preset colors used
   const hue = Math.floor(Math.random() * 360);
   return `hsl(${hue} 70% 65%)`;
 }
@@ -43,7 +43,7 @@ router.get('/:id', (req, res) => {
   const t = db
     .prepare('SELECT * FROM templates WHERE id = ? AND user_id = ?')
     .get(req.params.id, req.userId);
-  if (!t) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!t) return res.status(404).json({ error: 'Not found' });
   t.exercises = db.prepare(`
     SELECT te.*, e.name AS exercise_name
     FROM template_exercises te
@@ -56,7 +56,7 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   const { name, color, exercises } = req.body || {};
-  if (!name || !name.trim()) return res.status(400).json({ error: 'İsim gerekli' });
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
   const finalColor = color && color.trim() ? color.trim() : pickUnusedColor(req.userId);
   const insertTmpl = db.prepare('INSERT INTO templates (user_id, name, color) VALUES (?, ?, ?)');
   const insertEx = db.prepare(
@@ -77,7 +77,7 @@ router.put('/:id', (req, res) => {
   const { name, color, exercises } = req.body || {};
   const id = req.params.id;
   const t = db.prepare('SELECT * FROM templates WHERE id = ? AND user_id = ?').get(id, req.userId);
-  if (!t) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!t) return res.status(404).json({ error: 'Not found' });
   const txn = db.transaction(() => {
     db.prepare('UPDATE templates SET name = ?, color = ? WHERE id = ?')
       .run(name?.trim() || t.name, color || t.color, id);
@@ -98,12 +98,12 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   const id = req.params.id;
   const t = db.prepare('SELECT * FROM templates WHERE id = ? AND user_id = ?').get(id, req.userId);
-  if (!t) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!t) return res.status(404).json({ error: 'Not found' });
   db.prepare('UPDATE templates SET archived = 1 WHERE id = ?').run(id);
   res.json({ ok: true });
 });
 
-// Bir template'in en son session'ının workout note'unu getir
+// Get the workout_note from the most recent session using this template
 router.get('/:id/last-note', (req, res) => {
   const row = db.prepare(`
     SELECT workout_notes AS notes, session_date

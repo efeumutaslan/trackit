@@ -1,62 +1,62 @@
 #!/bin/bash
-# TrackIt — İlk Kurulum
-# ⚠️ DİKKAT: Bu script TÜM VERİLERİ SİLER. Sadece ilk kurulumda kullan.
-# Mevcut kurulumu güncellemek için: ./upgrade.sh
+# TrackIt — First-time install
+# WARNING: This script WIPES ALL DATA. Use it only for the very first install.
+# To update an existing install, run ./upgrade.sh instead.
 
 set -e
 
-echo "🏋️  TrackIt — İlk Kurulum"
+echo "🏋️  TrackIt — First-time install"
 echo ""
 
-# Docker var mı kontrol et
+# Docker check
 if ! command -v docker &> /dev/null; then
-  echo "❌ Docker bulunamadı. Kuruluyor..."
+  echo "❌ Docker not found. Installing..."
   curl -fsSL https://get.docker.com | sudo sh
   sudo usermod -aG docker "$USER"
   echo ""
-  echo "⚠️  Docker grubu eklendi. Şu komutu çalıştır ve script'i tekrar dene:"
+  echo "⚠️  Docker group added. Run this command and re-run the script:"
   echo "    newgrp docker"
   exit 1
 fi
 
-# docker compose v2 kontrolü
+# docker compose v2 check
 if ! docker compose version &> /dev/null; then
-  echo "❌ docker compose (v2 plugin) gerekli."
+  echo "❌ docker compose (v2 plugin) is required."
   echo "   sudo apt-get install -y docker-compose-plugin"
   exit 1
 fi
 
-# Volume varsa uyar
+# Volume warning
 if docker volume ls --format '{{.Name}}' | grep -q trackit_data; then
-  echo "⚠️  Mevcut trackit_data volume bulundu — TÜM VERİLER SİLİNECEK."
-  read -p "Devam etmek için 'evet' yaz: " CONFIRM
-  if [ "$CONFIRM" != "evet" ]; then
-    echo "İptal edildi."
+  echo "⚠️  Existing trackit_data volume found — ALL DATA WILL BE DELETED."
+  read -p "Type 'yes' to continue: " CONFIRM
+  if [ "$CONFIRM" != "yes" ]; then
+    echo "Cancelled."
     exit 0
   fi
 fi
 
-echo "🛑 Eski container'ları durdur..."
+echo "🛑 Stopping old containers..."
 docker compose down -v 2>/dev/null || true
 
-echo "🔨 Build ediliyor..."
+echo "🔨 Building..."
 docker compose build
 
-echo "🚀 Başlatılıyor..."
+echo "🚀 Starting..."
 docker compose up -d
 
 echo ""
-echo "⏳ Bekleniyor..."
+echo "⏳ Waiting..."
 sleep 6
 
 if curl -sf http://localhost:3000/api/health > /dev/null; then
-  echo "✅ TrackIt çalışıyor: http://localhost:3000"
+  echo "✅ TrackIt is running: http://localhost:3000"
   echo ""
-  echo "📌 Sonraki adımlar:"
-  echo "   1. Caddy kuruluysa Caddyfile içeriğini /etc/caddy/Caddyfile dosyasına ekle"
+  echo "📌 Next steps:"
+  echo "   1. If Caddy is installed, append the contents of Caddyfile to /etc/caddy/Caddyfile"
   echo "      sudo systemctl reload caddy"
-  echo "   2. https://track-it.duckdns.org adresinden açılacak"
+  echo "   2. It will be available at https://track-it.duckdns.org"
 else
-  echo "⚠️  Sağlık kontrolü başarısız. Logları kontrol et:"
+  echo "⚠️  Health check failed. Inspect the logs:"
   echo "    docker compose logs -f"
 fi

@@ -101,4 +101,4 @@ CREATE INDEX IF NOT EXISTS idx_sets_session_ex ON session_sets(session_exercise_
 CREATE INDEX IF NOT EXISTS idx_auth_user ON sessions_auth(user_id);
 `);
 
-console.log('DB hazır:', DB_PATH);
+console.log('DB ready:', DB_PATH);

@@ -22,27 +22,27 @@ export default function Home() {
           <button
             className="right-action"
             onClick={() => { logout(); nav('/login'); }}
-            title="Çıkış"
+            title="Sign out"
           >
-            Çıkış
+            Sign out
           </button>
         }
       />
       <div className="content">
         <div className="card" style={{ background: 'var(--peach-soft)', textAlign: 'center' }}>
-          <div style={{ fontSize: 14, color: 'var(--ink-soft)' }}>Hoş geldin</div>
+          <div style={{ fontSize: 14, color: 'var(--ink-soft)' }}>Welcome</div>
           <h2 style={{ margin: '4px 0 14px', fontSize: 22 }}>{user?.username}</h2>
-          <Link to="/log" className="btn primary">+ Antrenmanı kaydet</Link>
+          <Link to="/log" className="btn primary">+ Log a workout</Link>
         </div>
 
-        <div className="section-title">Takvim</div>
+        <div className="section-title">Calendar</div>
         <Calendar />
 
-        <div className="section-title">Son sessionlar</div>
+        <div className="section-title">Recent sessions</div>
         {recent.length === 0 ? (
           <div className="empty">
             <div className="icon">📋</div>
-            <div>Henüz session yok. İlk antrenmanını başlat!</div>
+            <div>No sessions yet. Start your first workout!</div>
           </div>
         ) : (
           recent.map((s) => (
@@ -53,7 +53,7 @@ export default function Home() {
                   style={{ background: s.template_color || 'var(--gray-soft)' }}
                 />
                 <div>
-                  <div style={{ fontWeight: 600 }}>{s.template_name || 'Sessiz session'}</div>
+                  <div style={{ fontWeight: 600 }}>{s.template_name || 'Untitled session'}</div>
                   <div className="small text-muted">{s.session_date}</div>
                 </div>
               </div>
@@ -62,7 +62,7 @@ export default function Home() {
           ))
         )}
         {recent.length > 0 && (
-          <Link to="/sessions" className="btn ghost mt-2">Tümünü gör</Link>
+          <Link to="/sessions" className="btn ghost mt-2">View all</Link>
         )}
       </div>
     </div>

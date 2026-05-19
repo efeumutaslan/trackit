@@ -5,7 +5,7 @@ import { api } from '../lib/api.js';
 
 function fmtTime(iso) {
   if (!iso) return '';
-  return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 export default function Session() {
@@ -38,7 +38,7 @@ export default function Session() {
   }
 
   async function delSession() {
-    if (!confirm('Bu session silinsin mi?')) return;
+    if (!confirm('Delete this session?')) return;
     await api.del(`/sessions/${id}`);
     nav('/sessions');
   }
@@ -49,13 +49,13 @@ export default function Session() {
         back
         title={s.template_name || 'Session'}
         right={
-          <button className="right-action" onClick={delSession} style={{ color: 'var(--red)' }}>Sil</button>
+          <button className="right-action" onClick={delSession} style={{ color: 'var(--red)' }}>Delete</button>
         }
       />
       <div className="content">
         <div className="card" style={{ borderLeft: `4px solid ${s.template_color || '#FFB07A'}` }}>
           <div className="field">
-            <label>Tarih</label>
+            <label>Date</label>
             <input
               type="date"
               value={s.session_date}
@@ -66,7 +66,7 @@ export default function Session() {
             <button
               className="btn sm"
               onClick={s.started_at ? () => {
-                const t = prompt('Başlangıç zamanı (HH:MM):', fmtTime(s.started_at));
+                const t = prompt('Start time (HH:MM):', fmtTime(s.started_at));
                 if (t) {
                   const [h, m] = t.split(':');
                   const d = new Date(s.session_date);
@@ -76,12 +76,12 @@ export default function Session() {
               } : startWO}
               style={{ flex: 1 }}
             >
-              ⏱ Başlangıç: {s.started_at ? fmtTime(s.started_at) : 'Başlat'}
+              ⏱ Start: {s.started_at ? fmtTime(s.started_at) : 'Begin'}
             </button>
             <button
               className="btn sm"
               onClick={s.finished_at ? () => {
-                const t = prompt('Bitiş zamanı (HH:MM):', fmtTime(s.finished_at));
+                const t = prompt('Finish time (HH:MM):', fmtTime(s.finished_at));
                 if (t) {
                   const [h, m] = t.split(':');
                   const d = new Date(s.session_date);
@@ -91,7 +91,7 @@ export default function Session() {
               } : finishWO}
               style={{ flex: 1 }}
             >
-              🏁 Bitiş: {s.finished_at ? fmtTime(s.finished_at) : 'Bitir'}
+              🏁 Finish: {s.finished_at ? fmtTime(s.finished_at) : 'End'}
             </button>
           </div>
         </div>
@@ -100,7 +100,7 @@ export default function Session() {
           <div className="prev-note-card">
             <div className="prev-note-head">
               <span className="prev-note-icon">📜</span>
-              <span className="prev-note-label">Önceki workout notu</span>
+              <span className="prev-note-label">Previous workout note</span>
               {s.prev_workout_notes_date && (
                 <span className="prev-note-date">{s.prev_workout_notes_date}</span>
               )}
@@ -110,31 +110,31 @@ export default function Session() {
         )}
 
         <div className="field">
-          <label>Workout notları</label>
+          <label>Workout notes</label>
           <textarea
             value={s.workout_notes || ''}
             onChange={(e) => setS((cur) => ({ ...cur, workout_notes: e.target.value }))}
             onBlur={() => saveMeta({ workout_notes: s.workout_notes })}
-            placeholder="Bu antrenman hakkında notlar…"
+            placeholder="Notes about this workout…"
           />
         </div>
 
-        <div className="section-title">Egzersizler</div>
+        <div className="section-title">Exercises</div>
         {s.exercises.map((ex) => (
           <ExerciseBlock key={ex.id} sessionId={s.id} ex={ex} reload={load} sessionDate={s.session_date} />
         ))}
 
-        <button className="btn mt-1" onClick={() => setShowAddEx(true)}>+ Egzersiz ekle</button>
+        <button className="btn mt-1" onClick={() => setShowAddEx(true)}>+ Add exercise</button>
 
-        <div className="section-title">Şablon</div>
+        <div className="section-title">Template</div>
         {s.template_id ? (
           <button className="btn ghost" onClick={async () => {
-            if (!confirm('Bu session\'daki değişiklikler şablona uygulansın mı? (Geçmiş workoutlar etkilenmez)')) return;
+            if (!confirm('Apply changes from this session to the template? (Past workouts are unaffected)')) return;
             await api.post(`/sessions/${id}/update-template`);
-            alert('Şablon güncellendi');
-          }}>♻ Bu şablonu güncelle</button>
+            alert('Template updated');
+          }}>♻ Update this template</button>
         ) : null}
-        <button className="btn ghost mt-1" onClick={() => setShowSaveTmpl(true)}>💾 Şablon olarak kaydet</button>
+        <button className="btn ghost mt-1" onClick={() => setShowSaveTmpl(true)}>💾 Save as template</button>
 
         {showAddEx && <AddExerciseModal sessionId={s.id} onClose={() => setShowAddEx(false)} reload={load} />}
         {showSaveTmpl && (
@@ -153,7 +153,6 @@ export default function Session() {
 function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
   const [notes, setNotes] = useState(ex.exercise_notes || '');
   const [adjust, setAdjust] = useState(ex.weight_adjust || '');
-  const [showPrev, setShowPrev] = useState(false);
   const [targetReps, setTargetReps] = useState(ex.target_reps || '');
 
   async function saveMeta(patch) {
@@ -177,7 +176,7 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
     reload();
   }
   async function delEx() {
-    if (!confirm(`${ex.exercise_name} silinsin mi?`)) return;
+    if (!confirm(`Delete ${ex.exercise_name}?`)) return;
     await api.del(`/sessions/${sessionId}/exercises/${ex.id}`);
     reload();
   }
@@ -190,12 +189,12 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
           <button
             className={`btn tiny ${adjust === 'up' ? '' : 'ghost'}`}
             onClick={() => setAdjustValue('up')}
-            title="Bir sonraki sefere arttır"
+            title="Increase weight next time"
           >▲</button>
           <button
             className={`btn tiny ${adjust === 'down' ? '' : 'ghost'}`}
             onClick={() => setAdjustValue('down')}
-            title="Bir sonraki sefere azalt"
+            title="Decrease weight next time"
           >▼</button>
           <button className="btn tiny ghost" onClick={delEx}>✕</button>
         </div>
@@ -203,12 +202,12 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
 
       <div className="row mb-1">
         <div>
-          <label className="small" style={{ color: 'var(--ink-soft)' }}>Hedef rep aralığı</label>
+          <label className="small" style={{ color: 'var(--ink-soft)' }}>Target rep range</label>
           <input
             value={targetReps}
             onChange={(e) => setTargetReps(e.target.value)}
             onBlur={() => saveMeta({ target_reps: targetReps })}
-            placeholder="örn 6-10"
+            placeholder="e.g. 6-10"
           />
         </div>
         <div>
@@ -216,7 +215,7 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
           <div className="tonnage-line" style={{ padding: '10px 0' }}>
             <span className="tag">{ex.tonnage.toFixed(1)} kg</span>
             {ex.prev_tonnage > 0 && (
-              <span className="tag muted">Önceki: {ex.prev_tonnage.toFixed(1)}</span>
+              <span className="tag muted">Previous: {ex.prev_tonnage.toFixed(1)}</span>
             )}
           </div>
         </div>
@@ -236,7 +235,7 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
           set={set}
           reload={reload}
           onWeightFilled={async (weight) => {
-            // bu setten sonraki, weight_kg boş olan setlere aynı kg'yi yaz
+            // cascade kg to subsequent empty sets
             const targets = ex.sets.slice(idx + 1).filter((s) => s.weight_kg == null || s.weight_kg === '');
             if (targets.length === 0) return;
             await Promise.all(
@@ -251,13 +250,13 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
           }}
         />
       ))}
-      <button className="btn ghost tiny mt-1" onClick={addSet}>+ Set ekle</button>
+      <button className="btn ghost tiny mt-1" onClick={addSet}>+ Add set</button>
 
       {ex.prev_exercise_notes && (
         <div className="prev-note-card prev-note-card--sm mt-2">
           <div className="prev-note-head">
             <span className="prev-note-icon">📜</span>
-            <span className="prev-note-label">Önceki egzersiz notu</span>
+            <span className="prev-note-label">Previous exercise note</span>
             {ex.prev_exercise_notes_date && (
               <span className="prev-note-date">{ex.prev_exercise_notes_date}</span>
             )}
@@ -267,12 +266,12 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
       )}
 
       <div className="field mt-2" style={{ marginBottom: 0 }}>
-        <label>Egzersiz notu</label>
+        <label>Exercise note</label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           onBlur={() => saveMeta()}
-          placeholder="Bu egzersiz hakkında not…"
+          placeholder="Note about this exercise…"
         />
       </div>
     </div>
@@ -290,7 +289,7 @@ function SetRow({ sessionId, set, reload, onWeightFilled }) {
       weight_kg: newW,
       reps_done: r === '' ? null : +r,
     });
-    // sadece kg yeni doldurulduğunda (önceden boş, şimdi dolu) cascade tetikle
+    // cascade only when kg was empty and now is filled
     const wasEmpty = prevW == null || prevW === '';
     if (wasEmpty && newW != null && onWeightFilled) {
       await onWeightFilled(newW);
@@ -300,7 +299,7 @@ function SetRow({ sessionId, set, reload, onWeightFilled }) {
   }
 
   async function del() {
-    if (!confirm('Set silinsin mi?')) return;
+    if (!confirm('Delete this set?')) return;
     await api.del(`/sessions/${sessionId}/sets/${set.id}`);
     reload();
   }
@@ -363,27 +362,27 @@ function AddExerciseModal({ sessionId, onClose, reload }) {
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Egzersiz ekle</h3>
+        <h3>Add exercise</h3>
         <div className="field">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Egzersiz ara veya yeni yaz…"
+            placeholder="Search or type a new one…"
             autoFocus
           />
         </div>
         <div className="row mb-2">
           <div>
-            <label className="small" style={{ color: 'var(--ink-soft)' }}>Set</label>
+            <label className="small" style={{ color: 'var(--ink-soft)' }}>Sets</label>
             <input type="number" value={targetSets} onChange={(e) => setTargetSets(+e.target.value)} />
           </div>
           <div>
-            <label className="small" style={{ color: 'var(--ink-soft)' }}>Rep aralığı</label>
+            <label className="small" style={{ color: 'var(--ink-soft)' }}>Rep range</label>
             <input value={targetReps} onChange={(e) => setTargetReps(e.target.value)} placeholder="6-10" />
           </div>
         </div>
         {filtered.length === 0 && q.trim() ? (
-          <button className="btn primary" onClick={createAndAdd}>+ "{q}" oluştur ve ekle</button>
+          <button className="btn primary" onClick={createAndAdd}>+ Create "{q}" and add</button>
         ) : (
           filtered.map((e) => (
             <div className="list-row" key={e.id} onClick={() => add(e.id)}>
@@ -392,7 +391,7 @@ function AddExerciseModal({ sessionId, onClose, reload }) {
             </div>
           ))
         )}
-        <button className="btn ghost mt-2" onClick={onClose}>İptal</button>
+        <button className="btn ghost mt-2" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );
@@ -414,13 +413,13 @@ function SaveAsTemplateModal({ sessionId, defaultName, onClose, reload }) {
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Şablon olarak kaydet</h3>
+        <h3>Save as template</h3>
         <div className="field">
-          <label>Şablon adı</label>
+          <label>Template name</label>
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </div>
         <div className="field">
-          <label>Renk</label>
+          <label>Color</label>
           <div className="color-picker">
             {COLORS.map((c) => (
               <button
@@ -435,11 +434,11 @@ function SaveAsTemplateModal({ sessionId, defaultName, onClose, reload }) {
             className="mt-1"
             value={color}
             onChange={(e) => setColor(e.target.value)}
-            placeholder="#hexkod"
+            placeholder="#hex"
           />
         </div>
-        <button className="btn primary" onClick={save}>Kaydet</button>
-        <button className="btn ghost mt-1" onClick={onClose}>İptal</button>
+        <button className="btn primary" onClick={save}>Save</button>
+        <button className="btn ghost mt-1" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );

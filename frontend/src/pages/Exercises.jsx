@@ -8,13 +8,13 @@ export default function Exercises() {
   useEffect(() => { api.get('/exercises').then(setRows); }, []);
   return (
     <div className="app-shell">
-      <TopBar back title="Egzersizler" />
+      <TopBar back title="Exercises" />
       <div className="content">
-        <Link to="/exercises/new" className="btn primary mb-2">+ Yeni egzersiz</Link>
+        <Link to="/exercises/new" className="btn primary mb-2">+ New exercise</Link>
         {rows.length === 0 ? (
           <div className="empty">
             <div className="icon">💪</div>
-            <div>Henüz egzersiz yok</div>
+            <div>No exercises yet</div>
           </div>
         ) : (
           rows.map((e) => (

@@ -8,10 +8,10 @@ const router = Router();
 router.post('/register', async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
-    return res.status(400).json({ error: 'Kullanıcı adı ve şifre gerekli' });
+    return res.status(400).json({ error: 'Username and password are required' });
   }
   if (username.length < 3 || password.length < 4) {
-    return res.status(400).json({ error: 'Kullanıcı adı min 3, şifre min 4 karakter' });
+    return res.status(400).json({ error: 'Username min 3 chars, password min 4 chars' });
   }
   try {
     const hash = await bcrypt.hash(password, 10);
@@ -23,22 +23,22 @@ router.post('/register', async (req, res) => {
     res.json({ token, username: username.trim(), userId: info.lastInsertRowid });
   } catch (e) {
     if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      return res.status(409).json({ error: 'Bu kullanıcı adı zaten alınmış' });
+      return res.status(409).json({ error: 'Username already taken' });
     }
     console.error(e);
-    res.status(500).json({ error: 'Kayıt başarısız' });
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 
 router.post('/login', async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
-    return res.status(400).json({ error: 'Kullanıcı adı ve şifre gerekli' });
+    return res.status(400).json({ error: 'Username and password are required' });
   }
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username.trim());
-  if (!user) return res.status(401).json({ error: 'Hatalı kullanıcı veya şifre' });
+  if (!user) return res.status(401).json({ error: 'Invalid username or password' });
   const ok = await bcrypt.compare(password, user.password_hash);
-  if (!ok) return res.status(401).json({ error: 'Hatalı kullanıcı veya şifre' });
+  if (!ok) return res.status(401).json({ error: 'Invalid username or password' });
   const token = generateToken();
   db.prepare('INSERT INTO sessions_auth (token, user_id) VALUES (?, ?)').run(token, user.id);
   res.json({ token, username: user.username, userId: user.id });

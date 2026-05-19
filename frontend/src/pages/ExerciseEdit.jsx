@@ -22,7 +22,7 @@ export default function ExerciseEdit() {
   }, [id, isNew]);
 
   async function save() {
-    if (!name.trim()) { alert('İsim gerekli'); return; }
+    if (!name.trim()) { alert('Name is required'); return; }
     if (isNew) {
       await api.post('/exercises', { name: name.trim(), notes });
     } else {
@@ -32,7 +32,7 @@ export default function ExerciseEdit() {
   }
 
   async function del() {
-    if (!confirm('Bu egzersiz silinsin mi? (Geçmiş kayıtlar etkilenmez)')) return;
+    if (!confirm('Delete this exercise? (Past records are kept)')) return;
     await api.del(`/exercises/${id}`);
     nav('/exercises');
   }
@@ -41,27 +41,27 @@ export default function ExerciseEdit() {
     <div className="app-shell">
       <TopBar
         back
-        title={isNew ? 'Yeni egzersiz' : 'Egzersizi düzenle'}
-        right={!isNew && <button className="right-action" onClick={del} style={{ color: 'var(--red)' }}>Sil</button>}
+        title={isNew ? 'New exercise' : 'Edit exercise'}
+        right={!isNew && <button className="right-action" onClick={del} style={{ color: 'var(--red)' }}>Delete</button>}
       />
       <div className="content">
         <div className="card">
           <div className="field">
-            <label>İsim</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="örn DB OHP" />
+            <label>Name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. DB OHP" />
           </div>
           <div className="field" style={{ marginBottom: 0 }}>
-            <label>Genel notlar (opsiyonel)</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Form ipucu, vs." />
+            <label>General notes (optional)</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Form cues, etc." />
           </div>
         </div>
-        <button className="btn primary mt-1" onClick={save}>Kaydet</button>
+        <button className="btn primary mt-1" onClick={save}>Save</button>
 
         {!isNew && progress.length > 0 && (
           <>
-            <div className="section-title">Rep-tonnage ilerleme</div>
+            <div className="section-title">Rep-tonnage progress</div>
             <ProgressChart data={progress} />
-            <div className="section-title">Session geçmişi</div>
+            <div className="section-title">Session history</div>
             {[...progress].reverse().map((p) => (
               <div className="list-row" key={p.session_id}>
                 <div className="meta">
@@ -97,7 +97,7 @@ function ProgressChart({ data }) {
           </div>
         ))}
       </div>
-      <div className="small text-muted mt-1 text-center">{data.length} session</div>
+      <div className="small text-muted mt-1 text-center">{data.length} sessions</div>
     </div>
   );
 }

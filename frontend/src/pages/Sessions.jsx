@@ -8,13 +8,13 @@ export default function Sessions() {
   useEffect(() => { api.get('/sessions').then(setRows); }, []);
   return (
     <div className="app-shell">
-      <TopBar back title="Sessionlar" />
+      <TopBar back title="Sessions" />
       <div className="content">
-        <Link to="/log" className="btn primary mb-2">+ Yeni session</Link>
+        <Link to="/log" className="btn primary mb-2">+ New session</Link>
         {rows.length === 0 ? (
           <div className="empty">
             <div className="icon">📋</div>
-            <div>Henüz session yok</div>
+            <div>No sessions yet</div>
           </div>
         ) : (
           rows.map((s) => (
@@ -22,7 +22,7 @@ export default function Sessions() {
               <div className="meta">
                 <span className="color-dot" style={{ background: s.template_color || 'var(--gray-soft)' }} />
                 <div>
-                  <div style={{ fontWeight: 600 }}>{s.template_name || 'Sessiz session'}</div>
+                  <div style={{ fontWeight: 600 }}>{s.template_name || 'Untitled session'}</div>
                   <div className="small text-muted">{s.session_date}</div>
                 </div>
               </div>

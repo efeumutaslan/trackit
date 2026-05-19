@@ -5,19 +5,19 @@ export default function BottomNav() {
     <nav className="bottomnav">
       <NavLink to="/" end>
         <span className="icon">🏠</span>
-        <span>Ana sayfa</span>
+        <span>Home</span>
       </NavLink>
       <NavLink to="/sessions">
         <span className="icon">📋</span>
-        <span>Sessionlar</span>
+        <span>Sessions</span>
       </NavLink>
       <NavLink to="/templates">
         <span className="icon">📐</span>
-        <span>Şablonlar</span>
+        <span>Templates</span>
       </NavLink>
       <NavLink to="/exercises">
         <span className="icon">💪</span>
-        <span>Egzersizler</span>
+        <span>Exercises</span>
       </NavLink>
     </nav>
   );

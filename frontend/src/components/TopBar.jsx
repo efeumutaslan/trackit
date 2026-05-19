@@ -5,7 +5,7 @@ export default function TopBar({ title, back = false, brand = false, right = nul
   return (
     <header className="topbar">
       {back ? (
-        <button className="back" onClick={() => nav(-1)} aria-label="Geri">‹</button>
+        <button className="back" onClick={() => nav(-1)} aria-label="Back">‹</button>
       ) : (
         <div style={{ width: 36 }} />
       )}

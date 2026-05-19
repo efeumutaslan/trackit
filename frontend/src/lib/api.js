@@ -15,7 +15,7 @@ async function request(path, opts = {}) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = new Error(data.error || 'Sunucu hatası');
+    const err = new Error(data.error || 'Server error');
     err.status = res.status;
     throw err;
   }

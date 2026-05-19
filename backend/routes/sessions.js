@@ -38,7 +38,7 @@ function loadSession(userId, sessionId) {
   `).get(sessionId, userId);
   if (!s) return null;
 
-  // Önceki workout notunu dinamik olarak çek (her zaman güncel)
+  // Resolve previous workout note dynamically (always current)
   if (s.template_id) {
     const prevWN = db.prepare(`
       SELECT workout_notes, session_date FROM workout_sessions
@@ -75,7 +75,7 @@ function loadSession(userId, sessionId) {
     );
     ex.tonnage = totals.tonnage;
     ex.total_reps = totals.reps;
-    // önceki session aynı egzersizden tonnage
+    // previous session tonnage for the same exercise
     const prev = db.prepare(`
       SELECT COALESCE(SUM(ss.weight_kg * ss.reps_done), 0) AS tonnage
       FROM workout_sessions ws
@@ -88,7 +88,7 @@ function loadSession(userId, sessionId) {
     `).get(userId, ex.exercise_id, s.session_date);
     ex.prev_tonnage = prev?.tonnage || 0;
 
-    // önceki exercise notunu dinamik çek
+    // resolve previous exercise note dynamically
     const prevExN = db.prepare(`
       SELECT se.exercise_notes, ws.session_date FROM session_exercises se
       JOIN workout_sessions ws ON ws.id = se.session_id
@@ -124,11 +124,11 @@ router.get('/', (req, res) => {
 
 router.get('/:id', (req, res) => {
   const s = loadSession(req.userId, req.params.id);
-  if (!s) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!s) return res.status(404).json({ error: 'Not found' });
   res.json(s);
 });
 
-// Yeni session başlat: template'den ya da boş
+// Create a new session from a template or empty
 router.post('/', (req, res) => {
   const { template_id, session_date, exercises, start_now } = req.body || {};
   const date = session_date || new Date().toISOString().slice(0, 10);
@@ -145,7 +145,7 @@ router.post('/', (req, res) => {
 
     let exToInsert = exercises;
     if (!exToInsert && template_id) {
-      // template'ten egzersizleri kopyala
+      // copy exercises from the template
       exToInsert = db.prepare(`
         SELECT exercise_id, order_idx, target_sets, target_reps
         FROM template_exercises WHERE template_id = ?
@@ -180,12 +180,12 @@ router.post('/', (req, res) => {
   res.json(loadSession(req.userId, sid));
 });
 
-// Session güncelle (notlar, başlangıç/bitiş, ekleme/silme)
+// Update session (notes, start/finish, add/remove)
 router.put('/:id', (req, res) => {
   const id = +req.params.id;
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!cur) return res.status(404).json({ error: 'Not found' });
 
   const {
     session_date, started_at, finished_at, workout_notes, template_id,
@@ -211,7 +211,7 @@ router.post('/:id/start', (req, res) => {
   const id = +req.params.id;
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!cur) return res.status(404).json({ error: 'Not found' });
   const now = new Date().toISOString();
   db.prepare('UPDATE workout_sessions SET started_at = ? WHERE id = ?').run(now, id);
   res.json({ started_at: now });
@@ -221,7 +221,7 @@ router.post('/:id/finish', (req, res) => {
   const id = +req.params.id;
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!cur) return res.status(404).json({ error: 'Not found' });
   const now = new Date().toISOString();
   db.prepare('UPDATE workout_sessions SET finished_at = ? WHERE id = ?').run(now, id);
   res.json({ finished_at: now });
@@ -231,19 +231,19 @@ router.delete('/:id', (req, res) => {
   const id = +req.params.id;
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!cur) return res.status(404).json({ error: 'Not found' });
   db.prepare('DELETE FROM workout_sessions WHERE id = ?').run(id);
   res.json({ ok: true });
 });
 
-// --- Session içindeki egzersizler ---
+// --- Exercises within a session ---
 router.post('/:id/exercises', (req, res) => {
   const id = +req.params.id;
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!cur) return res.status(404).json({ error: 'Not found' });
   const { exercise_id, target_sets, target_reps } = req.body || {};
-  if (!exercise_id) return res.status(400).json({ error: 'Egzersiz seç' });
+  if (!exercise_id) return res.status(400).json({ error: 'Select an exercise' });
   const maxOrder = db.prepare('SELECT COALESCE(MAX(order_idx), -1) AS m FROM session_exercises WHERE session_id = ?').get(id).m;
   const prevNote = getPrevExerciseNotes(req.userId, exercise_id, cur.session_date);
   const info = db.prepare(`
@@ -262,9 +262,9 @@ router.put('/:id/exercises/:seId', (req, res) => {
   const { id, seId } = req.params;
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!cur) return res.status(404).json({ error: 'Not found' });
   const se = db.prepare('SELECT * FROM session_exercises WHERE id = ? AND session_id = ?').get(seId, id);
-  if (!se) return res.status(404).json({ error: 'Egzersiz bulunamadı' });
+  if (!se) return res.status(404).json({ error: 'Exercise not found' });
   const { exercise_notes, weight_adjust, target_reps, target_sets } = req.body || {};
   db.prepare(`
     UPDATE session_exercises
@@ -284,17 +284,17 @@ router.delete('/:id/exercises/:seId', (req, res) => {
   const { id, seId } = req.params;
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!cur) return res.status(404).json({ error: 'Not found' });
   db.prepare('DELETE FROM session_exercises WHERE id = ? AND session_id = ?').run(seId, id);
   res.json({ ok: true });
 });
 
-// Set güncelle
+// Update a set
 router.put('/:id/sets/:setId', (req, res) => {
   const { id, setId } = req.params;
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!cur) return res.status(404).json({ error: 'Not found' });
   const { weight_kg, reps_done } = req.body || {};
   db.prepare('UPDATE session_sets SET weight_kg = ?, reps_done = ? WHERE id = ?')
     .run(weight_kg ?? null, reps_done ?? null, setId);
@@ -306,7 +306,7 @@ router.post('/:id/exercises/:seId/sets', (req, res) => {
   const { id, seId } = req.params;
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!cur) return res.status(404).json({ error: 'Not found' });
   const max = db.prepare('SELECT COALESCE(MAX(set_number), 0) AS m FROM session_sets WHERE session_exercise_id = ?').get(seId).m;
   const info = db.prepare('INSERT INTO session_sets (session_exercise_id, set_number) VALUES (?, ?)')
     .run(seId, max + 1);
@@ -317,19 +317,19 @@ router.delete('/:id/sets/:setId', (req, res) => {
   const { id, setId } = req.params;
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!cur) return res.status(404).json({ error: 'Not found' });
   db.prepare('DELETE FROM session_sets WHERE id = ?').run(setId);
   res.json({ ok: true });
 });
 
-// Session'ı yeni template olarak kaydet
+// Save the current session as a new template
 router.post('/:id/save-as-template', (req, res) => {
   const { id } = req.params;
   const { name, color } = req.body || {};
-  if (!name || !name.trim()) return res.status(400).json({ error: 'Template ismi gerekli' });
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Template name is required' });
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Session bulunamadı' });
+  if (!cur) return res.status(404).json({ error: 'Session not found' });
   const ses = db.prepare(`
     SELECT exercise_id, order_idx, target_sets, target_reps
     FROM session_exercises WHERE session_id = ? ORDER BY order_idx
@@ -349,13 +349,13 @@ router.post('/:id/save-as-template', (req, res) => {
   res.json({ template_id: tid });
 });
 
-// Session'daki mevcut template'i güncelle (gelecek session'ları etkiler)
+// Update the template attached to this session (affects future sessions)
 router.post('/:id/update-template', (req, res) => {
   const { id } = req.params;
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
-  if (!cur) return res.status(404).json({ error: 'Session bulunamadı' });
-  if (!cur.template_id) return res.status(400).json({ error: 'Bu session bir template ile başlamadı' });
+  if (!cur) return res.status(404).json({ error: 'Session not found' });
+  if (!cur.template_id) return res.status(400).json({ error: 'This session was not started from a template' });
   const ses = db.prepare(`
     SELECT exercise_id, order_idx, target_sets, target_reps
     FROM session_exercises WHERE session_id = ? ORDER BY order_idx
@@ -372,7 +372,7 @@ router.post('/:id/update-template', (req, res) => {
   res.json({ ok: true });
 });
 
-// Takvim için: tarih aralığında template_id/color/name
+// Calendar feed: template_id/color/name within a date range
 router.get('/calendar/:year/:month', (req, res) => {
   const { year, month } = req.params;
   const start = `${year}-${String(month).padStart(2, '0')}-01`;

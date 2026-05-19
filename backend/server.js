@@ -21,7 +21,7 @@ app.use('/api/exercises', exerciseRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/sessions', sessionRoutes);
 
-// Production: frontend build serve
+// Production: serve frontend build
 const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir));
 app.get(/^\/(?!api).*/, (req, res) => {
@@ -29,8 +29,8 @@ app.get(/^\/(?!api).*/, (req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('API hatası:', err);
-  res.status(500).json({ error: err.message || 'Sunucu hatası' });
+  console.error('API error:', err);
+  res.status(500).json({ error: err.message || 'Server error' });
 });
 
-app.listen(PORT, () => console.log(`TrackIt API ${PORT} portunda dinliyor`));
+app.listen(PORT, () => console.log(`TrackIt API listening on port ${PORT}`));

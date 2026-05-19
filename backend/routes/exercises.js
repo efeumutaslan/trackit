@@ -14,7 +14,7 @@ router.get('/', (req, res) => {
 
 router.post('/', (req, res) => {
   const { name, notes } = req.body || {};
-  if (!name || !name.trim()) return res.status(400).json({ error: 'İsim gerekli' });
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
   try {
     const info = db
       .prepare('INSERT INTO exercises (user_id, name, notes) VALUES (?, ?, ?)')
@@ -23,7 +23,7 @@ router.post('/', (req, res) => {
     res.json(row);
   } catch (e) {
     if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      return res.status(409).json({ error: 'Bu isimde egzersiz zaten var' });
+      return res.status(409).json({ error: 'An exercise with this name already exists' });
     }
     res.status(500).json({ error: e.message });
   }
@@ -33,7 +33,7 @@ router.put('/:id', (req, res) => {
   const { name, notes } = req.body || {};
   const id = req.params.id;
   const ex = db.prepare('SELECT * FROM exercises WHERE id = ? AND user_id = ?').get(id, req.userId);
-  if (!ex) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!ex) return res.status(404).json({ error: 'Not found' });
   db.prepare('UPDATE exercises SET name = ?, notes = ? WHERE id = ?')
     .run(name?.trim() || ex.name, notes ?? ex.notes, id);
   res.json(db.prepare('SELECT * FROM exercises WHERE id = ?').get(id));
@@ -42,12 +42,12 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   const id = req.params.id;
   const ex = db.prepare('SELECT * FROM exercises WHERE id = ? AND user_id = ?').get(id, req.userId);
-  if (!ex) return res.status(404).json({ error: 'Bulunamadı' });
+  if (!ex) return res.status(404).json({ error: 'Not found' });
   db.prepare('UPDATE exercises SET archived = 1 WHERE id = ?').run(id);
   res.json({ ok: true });
 });
 
-// Bir egzersizin önceki notunu getir (son session'dan)
+// Last note for an exercise (from the most recent prior session)
 router.get('/:id/last-note', (req, res) => {
   const row = db.prepare(`
     SELECT se.exercise_notes AS notes, ws.session_date
@@ -61,7 +61,7 @@ router.get('/:id/last-note', (req, res) => {
   res.json(row || { notes: '', session_date: null });
 });
 
-// Egzersiz progress: rep-tonnage by session
+// Exercise progress: rep-tonnage by session
 router.get('/:id/progress', (req, res) => {
   const id = req.params.id;
   const rows = db.prepare(`
