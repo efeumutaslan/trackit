@@ -29,11 +29,13 @@ export default function Session() {
   }
 
   async function startWO() {
-    const r = await api.post(`/sessions/${id}/start`);
+    const nowIso = new Date().toISOString();
+    const r = await api.post(`/sessions/${id}/start`, { at: nowIso });
     setS((cur) => ({ ...cur, started_at: r.started_at }));
   }
   async function finishWO() {
-    const r = await api.post(`/sessions/${id}/finish`);
+    const nowIso = new Date().toISOString();
+    const r = await api.post(`/sessions/${id}/finish`, { at: nowIso });
     setS((cur) => ({ ...cur, finished_at: r.finished_at }));
   }
 
@@ -233,19 +235,27 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
           key={set.id}
           sessionId={sessionId}
           set={set}
-          reload={reload}
-          onWeightFilled={async (weight) => {
-            // cascade kg to subsequent empty sets
-            const targets = ex.sets.slice(idx + 1).filter((s) => s.weight_kg == null || s.weight_kg === '');
-            if (targets.length === 0) return;
-            await Promise.all(
-              targets.map((s) =>
-                api.put(`/sessions/${sessionId}/sets/${s.id}`, {
-                  weight_kg: weight,
-                  reps_done: s.reps_done,
-                })
-              )
-            );
+          onSaved={async (newW) => {
+            // Cascade rule: when a set's kg gets filled, propagate that kg
+            // to all SUBSEQUENT sets whose kg is currently empty.
+            // We use the freshest data: ex.sets (parent passes new array on reload).
+            const prevW = set.weight_kg;
+            const wasEmpty = prevW == null || prevW === '';
+            if (wasEmpty && newW != null) {
+              const targets = ex.sets.slice(idx + 1).filter(
+                (s) => s.weight_kg == null || s.weight_kg === ''
+              );
+              if (targets.length > 0) {
+                await Promise.all(
+                  targets.map((s) =>
+                    api.put(`/sessions/${sessionId}/sets/${s.id}`, {
+                      weight_kg: newW,
+                      reps_done: s.reps_done,
+                    })
+                  )
+                );
+              }
+            }
             reload();
           }}
         />
@@ -278,30 +288,40 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
   );
 }
 
-function SetRow({ sessionId, set, reload, onWeightFilled }) {
+function SetRow({ sessionId, set, onSaved }) {
   const [w, setW] = useState(set.weight_kg ?? '');
   const [r, setR] = useState(set.reps_done ?? '');
 
-  async function save() {
-    const prevW = set.weight_kg;
+  // Sync local state when set prop changes (after a parent reload),
+  // unless the user is mid-edit (input focused). We keep it simple:
+  // if the incoming prop differs from local state and local state matches
+  // the previously seen prop, accept the new value.
+  useEffect(() => {
+    setW(set.weight_kg ?? '');
+    setR(set.reps_done ?? '');
+  }, [set.id, set.weight_kg, set.reps_done]);
+
+  async function saveKg() {
     const newW = w === '' ? null : +w;
     await api.put(`/sessions/${sessionId}/sets/${set.id}`, {
       weight_kg: newW,
       reps_done: r === '' ? null : +r,
     });
-    // cascade only when kg was empty and now is filled
-    const wasEmpty = prevW == null || prevW === '';
-    if (wasEmpty && newW != null && onWeightFilled) {
-      await onWeightFilled(newW);
-    } else {
-      reload();
-    }
+    if (onSaved) await onSaved(newW);
+  }
+
+  async function saveReps() {
+    await api.put(`/sessions/${sessionId}/sets/${set.id}`, {
+      weight_kg: w === '' ? null : +w,
+      reps_done: r === '' ? null : +r,
+    });
+    if (onSaved) await onSaved(null); // null signals "kg unchanged"
   }
 
   async function del() {
     if (!confirm('Delete this set?')) return;
     await api.del(`/sessions/${sessionId}/sets/${set.id}`);
-    reload();
+    if (onSaved) await onSaved(null);
   }
 
   return (
@@ -313,7 +333,7 @@ function SetRow({ sessionId, set, reload, onWeightFilled }) {
         step="0.5"
         value={w}
         onChange={(e) => setW(e.target.value)}
-        onBlur={save}
+        onBlur={saveKg}
         placeholder="-"
       />
       <input
@@ -321,7 +341,7 @@ function SetRow({ sessionId, set, reload, onWeightFilled }) {
         inputMode="numeric"
         value={r}
         onChange={(e) => setR(e.target.value)}
-        onBlur={save}
+        onBlur={saveReps}
         placeholder="-"
       />
       <button className="del" onClick={del}>×</button>

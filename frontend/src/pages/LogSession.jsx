@@ -5,7 +5,12 @@ import { api } from '../lib/api.js';
 
 export default function LogSession() {
   const [templates, setTemplates] = useState([]);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => {
+    // Local-time YYYY-MM-DD (avoids the UTC drift at night)
+    const d = new Date();
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    return new Date(d - tzOffset).toISOString().slice(0, 10);
+  });
   const [busy, setBusy] = useState(false);
   const nav = useNavigate();
 
@@ -20,7 +25,7 @@ export default function LogSession() {
       const s = await api.post('/sessions', {
         template_id: t.id,
         session_date: date,
-        start_now: true,
+        started_at: new Date().toISOString(),
       });
       nav(`/sessions/${s.id}`);
     } finally {
@@ -34,7 +39,7 @@ export default function LogSession() {
     try {
       const s = await api.post('/sessions', {
         session_date: date,
-        start_now: true,
+        started_at: new Date().toISOString(),
       });
       nav(`/sessions/${s.id}`);
     } finally {

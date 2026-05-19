@@ -130,9 +130,10 @@ router.get('/:id', (req, res) => {
 
 // Create a new session from a template or empty
 router.post('/', (req, res) => {
-  const { template_id, session_date, exercises, start_now } = req.body || {};
+  const { template_id, session_date, exercises, start_now, started_at } = req.body || {};
   const date = session_date || new Date().toISOString().slice(0, 10);
-  const startedAt = start_now ? new Date().toISOString() : null;
+  // Prefer client-provided started_at (correct timezone); fall back to start_now for compat
+  const startedAt = started_at || (start_now ? new Date().toISOString() : null);
   const prevWN = getPrevWorkoutNotes(req.userId, template_id, date);
 
   const txn = db.transaction(() => {
@@ -212,9 +213,9 @@ router.post('/:id/start', (req, res) => {
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
   if (!cur) return res.status(404).json({ error: 'Not found' });
-  const now = new Date().toISOString();
-  db.prepare('UPDATE workout_sessions SET started_at = ? WHERE id = ?').run(now, id);
-  res.json({ started_at: now });
+  const at = (req.body && req.body.at) || new Date().toISOString();
+  db.prepare('UPDATE workout_sessions SET started_at = ? WHERE id = ?').run(at, id);
+  res.json({ started_at: at });
 });
 
 router.post('/:id/finish', (req, res) => {
@@ -222,9 +223,9 @@ router.post('/:id/finish', (req, res) => {
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
   if (!cur) return res.status(404).json({ error: 'Not found' });
-  const now = new Date().toISOString();
-  db.prepare('UPDATE workout_sessions SET finished_at = ? WHERE id = ?').run(now, id);
-  res.json({ finished_at: now });
+  const at = (req.body && req.body.at) || new Date().toISOString();
+  db.prepare('UPDATE workout_sessions SET finished_at = ? WHERE id = ?').run(at, id);
+  res.json({ finished_at: at });
 });
 
 router.delete('/:id', (req, res) => {
