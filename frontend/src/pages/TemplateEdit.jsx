@@ -108,7 +108,17 @@ export default function TemplateEdit() {
                 <button key={c} className={color === c ? 'selected' : ''} style={{ background: c }} onClick={() => setColor(c)} />
               ))}
             </div>
-            <input className="mt-1" value={color} onChange={(e) => setColor(e.target.value)} placeholder="#hex" />
+            <div className="color-row">
+              <span className="color-preview" style={{ background: color }} />
+              <input
+                type="color"
+                className="color-wheel"
+                value={/^#[0-9A-Fa-f]{6}$/.test(color) ? color : '#FFB07A'}
+                onChange={(e) => setColor(e.target.value)}
+                title="Pick any color"
+              />
+              <input value={color} onChange={(e) => setColor(e.target.value)} placeholder="#hex" />
+            </div>
           </div>
         </div>
 
@@ -172,22 +182,26 @@ function AddExerciseModal({ roster, existingIds, onAdd, onCreate, onClose }) {
   );
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Add exercise</h3>
-        <div className="field">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search or type a new one…" autoFocus />
+      <div className="modal modal--search" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-sticky">
+          <h3>Add exercise</h3>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search or type a new one…" autoFocus />
+          </div>
         </div>
-        {filtered.length === 0 && q.trim() ? (
-          <button className="btn primary" onClick={() => onCreate(q)}>+ Create "{q}" and add</button>
-        ) : (
-          filtered.map((e) => (
-            <div className="list-row" key={e.id} onClick={() => onAdd(e)}>
-              <div className="meta"><span>💪</span> {e.name}</div>
-              <span>+</span>
-            </div>
-          ))
-        )}
-        <button className="btn ghost mt-2" onClick={onClose}>Cancel</button>
+        <div className="modal-scroll">
+          {filtered.length === 0 && q.trim() ? (
+            <button className="btn primary" onClick={() => onCreate(q)}>+ Create "{q}" and add</button>
+          ) : (
+            filtered.map((e) => (
+              <div className="list-row" key={e.id} onClick={() => onAdd(e)}>
+                <div className="meta"><span>💪</span> {e.name}</div>
+                <span>+</span>
+              </div>
+            ))
+          )}
+        </div>
+        <button className="btn ghost mt-1" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );

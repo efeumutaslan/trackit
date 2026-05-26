@@ -381,37 +381,41 @@ function AddExerciseModal({ sessionId, onClose, reload }) {
 
   return (
     <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Add exercise</h3>
-        <div className="field">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search or type a new one…"
-            autoFocus
-          />
-        </div>
-        <div className="row mb-2">
-          <div>
-            <label className="small" style={{ color: 'var(--ink-soft)' }}>Sets</label>
-            <input type="number" value={targetSets} onChange={(e) => setTargetSets(+e.target.value)} />
+      <div className="modal modal--search" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-sticky">
+          <h3>Add exercise</h3>
+          <div className="field" style={{ marginBottom: 10 }}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search or type a new one…"
+              autoFocus
+            />
           </div>
-          <div>
-            <label className="small" style={{ color: 'var(--ink-soft)' }}>Rep range</label>
-            <input value={targetReps} onChange={(e) => setTargetReps(e.target.value)} placeholder="6-10" />
-          </div>
-        </div>
-        {filtered.length === 0 && q.trim() ? (
-          <button className="btn primary" onClick={createAndAdd}>+ Create "{q}" and add</button>
-        ) : (
-          filtered.map((e) => (
-            <div className="list-row" key={e.id} onClick={() => add(e.id)}>
-              <div className="meta"><span>💪</span> {e.name}</div>
-              <span style={{ color: 'var(--gray)' }}>+</span>
+          <div className="row" style={{ marginBottom: 0 }}>
+            <div>
+              <label className="small" style={{ color: 'var(--ink-soft)' }}>Sets</label>
+              <input type="number" value={targetSets} onChange={(e) => setTargetSets(+e.target.value)} />
             </div>
-          ))
-        )}
-        <button className="btn ghost mt-2" onClick={onClose}>Cancel</button>
+            <div>
+              <label className="small" style={{ color: 'var(--ink-soft)' }}>Rep range</label>
+              <input value={targetReps} onChange={(e) => setTargetReps(e.target.value)} placeholder="6-10" />
+            </div>
+          </div>
+        </div>
+        <div className="modal-scroll">
+          {filtered.length === 0 && q.trim() ? (
+            <button className="btn primary" onClick={createAndAdd}>+ Create "{q}" and add</button>
+          ) : (
+            filtered.map((e) => (
+              <div className="list-row" key={e.id} onClick={() => add(e.id)}>
+                <div className="meta"><span>💪</span> {e.name}</div>
+                <span style={{ color: 'var(--gray)' }}>+</span>
+              </div>
+            ))
+          )}
+        </div>
+        <button className="btn ghost mt-1" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );
@@ -450,12 +454,21 @@ function SaveAsTemplateModal({ sessionId, defaultName, onClose, reload }) {
               />
             ))}
           </div>
-          <input
-            className="mt-1"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            placeholder="#hex"
-          />
+          <div className="color-row">
+            <span className="color-preview" style={{ background: color }} />
+            <input
+              type="color"
+              className="color-wheel"
+              value={/^#[0-9A-Fa-f]{6}$/.test(color) ? color : '#FFB07A'}
+              onChange={(e) => setColor(e.target.value)}
+              title="Pick any color"
+            />
+            <input
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              placeholder="#hex"
+            />
+          </div>
         </div>
         <button className="btn primary" onClick={save}>Save</button>
         <button className="btn ghost mt-1" onClick={onClose}>Cancel</button>

@@ -29,6 +29,38 @@ function getPrevExerciseNotes(userId, exerciseId, beforeDate) {
   return row?.exercise_notes || '';
 }
 
+// Returns an ordered list of weight_kg values from the most recent prior
+// session of the same exercise. Prefers a session with the same template.
+function getPrevSetWeights(userId, exerciseId, templateId, beforeDate) {
+  // find the most recent prior session_exercise for this exercise
+  let sourceSE = null;
+  if (templateId) {
+    sourceSE = db.prepare(`
+      SELECT se.id FROM session_exercises se
+      JOIN workout_sessions ws ON ws.id = se.session_id
+      WHERE ws.user_id = ? AND se.exercise_id = ?
+        AND ws.template_id = ? AND ws.session_date < ?
+      ORDER BY ws.session_date DESC, ws.id DESC LIMIT 1
+    `).get(userId, exerciseId, templateId, beforeDate);
+  }
+  if (!sourceSE) {
+    sourceSE = db.prepare(`
+      SELECT se.id FROM session_exercises se
+      JOIN workout_sessions ws ON ws.id = se.session_id
+      WHERE ws.user_id = ? AND se.exercise_id = ?
+        AND ws.session_date < ?
+      ORDER BY ws.session_date DESC, ws.id DESC LIMIT 1
+    `).get(userId, exerciseId, beforeDate);
+  }
+  if (!sourceSE) return [];
+  const rows = db.prepare(`
+    SELECT weight_kg FROM session_sets
+    WHERE session_exercise_id = ?
+    ORDER BY set_number
+  `).all(sourceSE.id);
+  return rows.map((r) => r.weight_kg);
+}
+
 function loadSession(userId, sessionId) {
   const s = db.prepare(`
     SELECT ws.*, t.name AS template_name, t.color AS template_color
@@ -88,15 +120,31 @@ function loadSession(userId, sessionId) {
     `).get(userId, ex.exercise_id, s.session_date);
     ex.prev_tonnage = prev?.tonnage || 0;
 
-    // resolve previous exercise note dynamically
-    const prevExN = db.prepare(`
-      SELECT se.exercise_notes, ws.session_date FROM session_exercises se
-      JOIN workout_sessions ws ON ws.id = se.session_id
-      WHERE ws.user_id = ? AND se.exercise_id = ?
-        AND ws.session_date < ?
-        AND COALESCE(se.exercise_notes,'') != ''
-      ORDER BY ws.session_date DESC, ws.id DESC LIMIT 1
-    `).get(userId, ex.exercise_id, s.session_date);
+    // resolve previous exercise note dynamically.
+    // Priority: most recent note from a session using the SAME template;
+    // fall back to the most recent note for this exercise from ANY session.
+    let prevExN = null;
+    if (s.template_id) {
+      prevExN = db.prepare(`
+        SELECT se.exercise_notes, ws.session_date FROM session_exercises se
+        JOIN workout_sessions ws ON ws.id = se.session_id
+        WHERE ws.user_id = ? AND se.exercise_id = ?
+          AND ws.template_id = ?
+          AND ws.session_date < ?
+          AND COALESCE(se.exercise_notes,'') != ''
+        ORDER BY ws.session_date DESC, ws.id DESC LIMIT 1
+      `).get(userId, ex.exercise_id, s.template_id, s.session_date);
+    }
+    if (!prevExN) {
+      prevExN = db.prepare(`
+        SELECT se.exercise_notes, ws.session_date FROM session_exercises se
+        JOIN workout_sessions ws ON ws.id = se.session_id
+        WHERE ws.user_id = ? AND se.exercise_id = ?
+          AND ws.session_date < ?
+          AND COALESCE(se.exercise_notes,'') != ''
+        ORDER BY ws.session_date DESC, ws.id DESC LIMIT 1
+      `).get(userId, ex.exercise_id, s.session_date);
+    }
     ex.prev_exercise_notes = prevExN?.exercise_notes || '';
     ex.prev_exercise_notes_date = prevExN?.session_date || null;
   }
@@ -162,7 +210,7 @@ router.post('/', (req, res) => {
     `);
     const insSet = db.prepare(`
       INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, reps_done)
-      VALUES (?, ?, NULL, NULL)
+      VALUES (?, ?, ?, NULL)
     `);
     exToInsert.forEach((ex, idx) => {
       const prevNote = getPrevExerciseNotes(req.userId, ex.exercise_id, date);
@@ -172,7 +220,12 @@ router.post('/', (req, res) => {
       );
       const seId = seInfo.lastInsertRowid;
       const setsCount = ex.target_sets || 3;
-      for (let i = 1; i <= setsCount; i++) insSet.run(seId, i);
+      // Pre-fill set weights with last session's weights (same template preferred)
+      const prevWeights = getPrevSetWeights(req.userId, ex.exercise_id, template_id || null, date);
+      for (let i = 1; i <= setsCount; i++) {
+        const w = prevWeights[i - 1] != null ? prevWeights[i - 1] : null;
+        insSet.run(seId, i, w);
+      }
     });
     return sid;
   });
@@ -253,8 +306,10 @@ router.post('/:id/exercises', (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(id, exercise_id, maxOrder + 1, target_sets || 3, target_reps || '', prevNote);
   const seId = info.lastInsertRowid;
+  const prevWeights = getPrevSetWeights(req.userId, exercise_id, cur.template_id || null, cur.session_date);
   for (let i = 1; i <= (target_sets || 3); i++) {
-    db.prepare('INSERT INTO session_sets (session_exercise_id, set_number) VALUES (?, ?)').run(seId, i);
+    const w = prevWeights[i - 1] != null ? prevWeights[i - 1] : null;
+    db.prepare('INSERT INTO session_sets (session_exercise_id, set_number, weight_kg) VALUES (?, ?, ?)').run(seId, i, w);
   }
   res.json(loadSession(req.userId, id));
 });
