@@ -301,19 +301,26 @@ function SetRow({ sessionId, set, onSaved }) {
     setR(set.reps_done ?? '');
   }, [set.id, set.weight_kg, set.reps_done]);
 
+  // Parse a weight string that may use comma as decimal separator
+  function parseW(val) {
+    if (val === '' || val == null) return null;
+    const n = parseFloat(String(val).replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  }
+
   async function saveKg() {
-    const newW = w === '' ? null : +w;
+    const newW = parseW(w);
     await api.put(`/sessions/${sessionId}/sets/${set.id}`, {
       weight_kg: newW,
-      reps_done: r === '' ? null : +r,
+      reps_done: r === '' ? null : parseInt(r, 10),
     });
     if (onSaved) await onSaved(newW);
   }
 
   async function saveReps() {
     await api.put(`/sessions/${sessionId}/sets/${set.id}`, {
-      weight_kg: w === '' ? null : +w,
-      reps_done: r === '' ? null : +r,
+      weight_kg: parseW(w),
+      reps_done: r === '' ? null : parseInt(r, 10),
     });
     if (onSaved) await onSaved(null); // null signals "kg unchanged"
   }
@@ -328,19 +335,18 @@ function SetRow({ sessionId, set, onSaved }) {
     <div className="set-row">
       <div className="set-num">{set.set_number}</div>
       <input
-        type="number"
+        type="text"
         inputMode="decimal"
-        step="0.5"
         value={w}
-        onChange={(e) => setW(e.target.value)}
+        onChange={(e) => setW(e.target.value.replace(/[^0-9.,]/g, ''))}
         onBlur={saveKg}
         placeholder="-"
       />
       <input
-        type="number"
+        type="text"
         inputMode="numeric"
         value={r}
-        onChange={(e) => setR(e.target.value)}
+        onChange={(e) => setR(e.target.value.replace(/[^0-9]/g, ''))}
         onBlur={saveReps}
         placeholder="-"
       />

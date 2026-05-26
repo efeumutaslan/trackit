@@ -330,6 +330,35 @@ a { color: inherit; text-decoration: none; }
 .calendar-grid .day.today { outline: 2px solid var(--peach); outline-offset: -2px; }
 .calendar-grid .day.has-session { color: var(--white); }
 .calendar-grid .day.empty { background: transparent; }
+.calendar-grid .day .day-num { position: relative; z-index: 1; }
+.calendar-grid .day .day-count {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  font-size: 8px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.85);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 0 3px;
+  line-height: 1.3;
+  z-index: 2;
+}
+.calendar-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--gray);
+}
+.calendar-legend .legend-box {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--peach);
+}
 
 /* Set row */
 .set-row {
