@@ -331,6 +331,17 @@ function SetRow({ sessionId, set, onSaved }) {
     if (onSaved) await onSaved({ kind: 'del' });
   }
 
+  // iOS Safari sometimes ignores select() called synchronously in onFocus.
+  // Using requestAnimationFrame + setSelectionRange is the most reliable
+  // way to highlight the existing value so typing overwrites it.
+  function selectAll(e) {
+    const el = e.target;
+    requestAnimationFrame(() => {
+      try { el.setSelectionRange(0, el.value.length); }
+      catch { el.select?.(); }
+    });
+  }
+
   return (
     <div className="set-row">
       <div className="set-num">{set.set_number}</div>
@@ -338,6 +349,7 @@ function SetRow({ sessionId, set, onSaved }) {
         type="text"
         inputMode="decimal"
         value={w}
+        onFocus={selectAll}
         onChange={(e) => setW(e.target.value.replace(/[^0-9.,]/g, ''))}
         onBlur={saveKg}
         placeholder="-"
@@ -346,6 +358,7 @@ function SetRow({ sessionId, set, onSaved }) {
         type="text"
         inputMode="numeric"
         value={r}
+        onFocus={selectAll}
         onChange={(e) => setR(e.target.value.replace(/[^0-9]/g, ''))}
         onBlur={saveReps}
         placeholder="-"
