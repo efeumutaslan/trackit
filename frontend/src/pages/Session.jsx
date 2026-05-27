@@ -235,25 +235,25 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
           key={set.id}
           sessionId={sessionId}
           set={set}
-          onSaved={async (newW) => {
-            // Cascade rule: when a set's kg gets filled, propagate that kg
-            // to all SUBSEQUENT sets whose kg is currently empty.
-            // We use the freshest data: ex.sets (parent passes new array on reload).
-            const prevW = set.weight_kg;
-            const wasEmpty = prevW == null || prevW === '';
-            if (wasEmpty && newW != null) {
-              const targets = ex.sets.slice(idx + 1).filter(
-                (s) => s.weight_kg == null || s.weight_kg === ''
-              );
-              if (targets.length > 0) {
-                await Promise.all(
-                  targets.map((s) =>
-                    api.put(`/sessions/${sessionId}/sets/${s.id}`, {
-                      weight_kg: newW,
-                      reps_done: s.reps_done,
-                    })
-                  )
-                );
+          onSaved={async (evt) => {
+            // Cascade rule: when the user CHANGES a set's kg, propagate
+            // the new value to ALL subsequent sets (overwriting them).
+            // Earlier sets are never touched. Triggered only on the 'kg' kind.
+            if (evt && evt.kind === 'kg') {
+              const newW = evt.newW;
+              const prevW = set.weight_kg;
+              if (newW !== prevW) {
+                const targets = ex.sets.slice(idx + 1);
+                if (targets.length > 0) {
+                  await Promise.all(
+                    targets.map((s) =>
+                      api.put(`/sessions/${sessionId}/sets/${s.id}`, {
+                        weight_kg: newW,
+                        reps_done: s.reps_done,
+                      })
+                    )
+                  );
+                }
               }
             }
             reload();
@@ -314,7 +314,7 @@ function SetRow({ sessionId, set, onSaved }) {
       weight_kg: newW,
       reps_done: r === '' ? null : parseInt(r, 10),
     });
-    if (onSaved) await onSaved(newW);
+    if (onSaved) await onSaved({ kind: 'kg', newW });
   }
 
   async function saveReps() {
@@ -322,13 +322,13 @@ function SetRow({ sessionId, set, onSaved }) {
       weight_kg: parseW(w),
       reps_done: r === '' ? null : parseInt(r, 10),
     });
-    if (onSaved) await onSaved(null); // null signals "kg unchanged"
+    if (onSaved) await onSaved({ kind: 'rep' });
   }
 
   async function del() {
     if (!confirm('Delete this set?')) return;
     await api.del(`/sessions/${sessionId}/sets/${set.id}`);
-    if (onSaved) await onSaved(null);
+    if (onSaved) await onSaved({ kind: 'del' });
   }
 
   return (
