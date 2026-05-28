@@ -47,6 +47,47 @@ git pull
 
 The DB is backed up to `~/trackit-backups/` on every upgrade.
 
+## Off-host backups (weekly to a private GitHub repo)
+
+`scripts/backup-to-github.sh` snapshots the live DB, gzips it, and pushes
+it into a second private GitHub repo. This way, if the entire server (or
+the Oracle Free Tier itself) disappears, the data is recoverable from
+GitHub.
+
+One-time setup on the server:
+
+1. On GitHub, create a **private** repo called `trackit-backups`.
+2. Create a **fine-grained PAT**:
+   - Repository access: only `trackit-backups`
+   - Repository permissions: **Contents = Read and write**
+3. Save the token to the server, locked down:
+   ```bash
+   echo 'ghp_xxx...' > ~/.trackit-backup-token
+   chmod 600 ~/.trackit-backup-token
+   ```
+4. Add a weekly cron job (Sundays at 04:00):
+   ```bash
+   crontab -e
+   # then add:
+   0 4 * * 0 /home/ubuntu/trackit/scripts/backup-to-github.sh >> /home/ubuntu/trackit-backup.log 2>&1
+   ```
+5. Optional first manual run to verify:
+   ```bash
+   ./scripts/backup-to-github.sh
+   ```
+
+Restore on a fresh host:
+
+```bash
+git clone https://github.com/<USER>/trackit-backups.git /tmp/bkp
+git clone https://github.com/<USER>/trackit.git && cd trackit
+./install.sh
+docker compose stop app
+gunzip -c /tmp/bkp/trackit-<DATE>.db.gz > /tmp/restore.db
+docker compose cp /tmp/restore.db app:/app/data/trackit.db
+docker compose start app
+```
+
 ## Local development
 
 ```bash
