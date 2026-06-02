@@ -5,6 +5,14 @@ import Calendar from '../components/Calendar.jsx';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = String(iso).slice(0, 10);
+  const [y, m, day] = d.split('-');
+  if (!y || !m || !day) return iso;
+  return `${day}.${m}.${y}`;
+}
+
 export default function Home() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
@@ -29,10 +37,12 @@ export default function Home() {
         }
       />
       <div className="content">
-        <div className="card" style={{ background: 'var(--peach-soft)', textAlign: 'center' }}>
-          <div style={{ fontSize: 14, color: 'var(--ink-soft)' }}>Welcome</div>
-          <h2 style={{ margin: '4px 0 14px', fontSize: 22 }}>{user?.username}</h2>
-          <Link to="/log" className="btn primary">+ Log a workout</Link>
+        <div className="welcome-bar">
+          <div className="welcome-bar__name">
+            <span className="welcome-bar__hi">Hi,</span>
+            <span className="welcome-bar__user">{user?.username}</span>
+          </div>
+          <Link to="/log" className="btn primary welcome-bar__cta">+ Log a workout</Link>
         </div>
 
         <div className="section-title">Calendar</div>
@@ -54,7 +64,7 @@ export default function Home() {
                 />
                 <div>
                   <div style={{ fontWeight: 600 }}>{s.template_name || 'Untitled session'}</div>
-                  <div className="small text-muted">{s.session_date}</div>
+                  <div className="small text-muted">{fmtDate(s.session_date)}</div>
                 </div>
               </div>
               <span style={{ color: 'var(--gray)' }}>›</span>

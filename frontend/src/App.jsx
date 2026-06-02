@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, matchPath } from 'react-router-dom';
 import { useAuth } from './lib/auth.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import Login from './pages/Login.jsx';
@@ -36,7 +36,16 @@ export default function App() {
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <BottomNav />
+      <ConditionalBottomNav />
     </>
   );
+}
+
+// Hide the bottom nav while inside an active session so the user has the
+// whole viewport for logging sets without distractions.
+function ConditionalBottomNav() {
+  const loc = useLocation();
+  const inSession = matchPath('/sessions/:id', loc.pathname);
+  if (inSession) return null;
+  return <BottomNav />;
 }

@@ -3,6 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = String(iso).slice(0, 10);
+  const [y, m, day] = d.split('-');
+  if (!y || !m || !day) return iso;
+  return `${day}.${m}.${y}`;
+}
+
 export default function ExerciseEdit() {
   const { id } = useParams();
   const isNew = id === 'new';
@@ -66,7 +74,7 @@ export default function ExerciseEdit() {
               <div className="list-row" key={p.session_id}>
                 <div className="meta">
                   <div>
-                    <div style={{ fontWeight: 600 }}>{p.session_date}</div>
+                    <div style={{ fontWeight: 600 }}>{fmtDate(p.session_date)}</div>
                     <div className="small text-muted">Top: {p.top_weight} kg</div>
                   </div>
                 </div>
@@ -86,7 +94,7 @@ function ProgressChart({ data }) {
     <div className="card">
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 120 }}>
         {data.map((d) => (
-          <div key={d.session_id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }} title={`${d.session_date}: ${d.tonnage.toFixed(0)} kg`}>
+          <div key={d.session_id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }} title={`${fmtDate(d.session_date)}: ${d.tonnage.toFixed(0)} kg`}>
             <div style={{
               width: '100%',
               height: `${(d.tonnage / max) * 100}%`,

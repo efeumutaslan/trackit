@@ -8,6 +8,15 @@ function fmtTime(iso) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+// Format ISO date (YYYY-MM-DD or full ISO) as DD.MM.YYYY.
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = String(iso).slice(0, 10); // YYYY-MM-DD
+  const [y, m, day] = d.split('-');
+  if (!y || !m || !day) return iso;
+  return `${day}.${m}.${y}`;
+}
+
 export default function Session() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -156,6 +165,7 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
   const [notes, setNotes] = useState(ex.exercise_notes || '');
   const [adjust, setAdjust] = useState(ex.weight_adjust || '');
   const [targetReps, setTargetReps] = useState(ex.target_reps || '');
+  const [showReplace, setShowReplace] = useState(false);
 
   async function saveMeta(patch) {
     await api.put(`/sessions/${sessionId}/exercises/${ex.id}`, {
@@ -183,24 +193,41 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
     reload();
   }
 
+  async function move(direction) {
+    await api.post(`/sessions/${sessionId}/exercises/${ex.id}/move`, { direction });
+    reload();
+  }
+
+  const cardClass =
+    'card exercise-block' +
+    (ex.prev_weight_adjust === 'up' ? ' exercise-block--prev-up' :
+     ex.prev_weight_adjust === 'down' ? ' exercise-block--prev-down' : '');
+
   return (
-    <div className="card exercise-block">
+    <div className={cardClass}>
       <div className="exercise-head">
-        <h4>{ex.exercise_name}</h4>
+        <h4 style={{ marginBottom: 4 }}>{ex.exercise_name}</h4>
         <div style={{ display: 'flex', gap: 4 }}>
-          <button
-            className={`btn tiny ${adjust === 'up' ? '' : 'ghost'}`}
-            onClick={() => setAdjustValue('up')}
-            title="Increase weight next time"
-          >▲</button>
-          <button
-            className={`btn tiny ${adjust === 'down' ? '' : 'ghost'}`}
-            onClick={() => setAdjustValue('down')}
-            title="Decrease weight next time"
-          >▼</button>
-          <button className="btn tiny ghost" onClick={delEx}>✕</button>
+          <button className="btn tiny ghost" onClick={() => move('up')} title="Move up">↑</button>
+          <button className="btn tiny ghost" onClick={() => move('down')} title="Move down">↓</button>
+          <button className="btn tiny ghost" onClick={() => setShowReplace(true)} title="Replace exercise">⇄</button>
+          <button className="btn tiny ghost" onClick={delEx} title="Remove">✕</button>
         </div>
       </div>
+
+      {/* Previous exercise note — placed right below the exercise name */}
+      {ex.prev_exercise_notes && (
+        <div className="prev-note-card prev-note-card--sm" style={{ marginBottom: 10 }}>
+          <div className="prev-note-head">
+            <span className="prev-note-icon">📜</span>
+            <span className="prev-note-label">Previous exercise note</span>
+            {ex.prev_exercise_notes_date && (
+              <span className="prev-note-date">{fmtDate(ex.prev_exercise_notes_date)}</span>
+            )}
+          </div>
+          <div className="prev-note-body">{ex.prev_exercise_notes}</div>
+        </div>
+      )}
 
       <div className="row mb-1">
         <div>
@@ -236,9 +263,6 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
           sessionId={sessionId}
           set={set}
           onSaved={async (evt) => {
-            // Cascade rule: when the user CHANGES a set's kg, propagate
-            // the new value to ALL subsequent sets (overwriting them).
-            // Earlier sets are never touched. Triggered only on the 'kg' kind.
             if (evt && evt.kind === 'kg') {
               const newW = evt.newW;
               const prevW = set.weight_kg;
@@ -262,28 +286,38 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate }) {
       ))}
       <button className="btn ghost tiny mt-1" onClick={addSet}>+ Add set</button>
 
-      {ex.prev_exercise_notes && (
-        <div className="prev-note-card prev-note-card--sm mt-2">
-          <div className="prev-note-head">
-            <span className="prev-note-icon">📜</span>
-            <span className="prev-note-label">Previous exercise note</span>
-            {ex.prev_exercise_notes_date && (
-              <span className="prev-note-date">{ex.prev_exercise_notes_date}</span>
-            )}
-          </div>
-          <div className="prev-note-body">{ex.prev_exercise_notes}</div>
-        </div>
-      )}
-
-      <div className="field mt-2" style={{ marginBottom: 0 }}>
-        <label>Exercise note</label>
+      {/* Note area: narrower textarea on the left, vertical adjust buttons on the right */}
+      <div className="note-with-adjust mt-2">
         <textarea
+          className="note-area"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           onBlur={() => saveMeta()}
           placeholder="Note about this exercise…"
         />
+        <div className="adjust-stack">
+          <button
+            className={`adjust-btn adjust-up${adjust === 'up' ? ' pressed' : ''}`}
+            onClick={() => setAdjustValue('up')}
+            title="Plan to go heavier next time"
+          >▲</button>
+          <button
+            className={`adjust-btn adjust-down${adjust === 'down' ? ' pressed' : ''}`}
+            onClick={() => setAdjustValue('down')}
+            title="Plan to back off next time"
+          >▼</button>
+        </div>
       </div>
+
+      {showReplace && (
+        <ReplaceExerciseModal
+          sessionId={sessionId}
+          seId={ex.id}
+          currentExerciseId={ex.exercise_id}
+          onClose={() => setShowReplace(false)}
+          reload={reload}
+        />
+      )}
     </div>
   );
 }
@@ -441,6 +475,62 @@ function AddExerciseModal({ sessionId, onClose, reload }) {
 }
 
 const COLORS = ['#FFB07A','#7AC4FF','#9CD879','#FF7A9C','#C49CFF','#FFD06B','#5BC5C5','#FF8C61','#A28DFE','#FFA8A8'];
+
+function ReplaceExerciseModal({ sessionId, seId, currentExerciseId, onClose, reload }) {
+  const [roster, setRoster] = useState([]);
+  const [q, setQ] = useState('');
+
+  useEffect(() => {
+    api.get('/exercises').then(setRoster).catch(() => {});
+  }, []);
+
+  const filtered = roster
+    .filter((e) => e.id !== currentExerciseId)
+    .filter((e) => e.name.toLowerCase().includes(q.toLowerCase()));
+
+  async function pick(exerciseId) {
+    await api.post(`/sessions/${sessionId}/exercises/${seId}/replace`, { exercise_id: exerciseId });
+    reload();
+    onClose();
+  }
+
+  async function createAndPick() {
+    if (!q.trim()) return;
+    const ex = await api.post('/exercises', { name: q.trim() });
+    await pick(ex.id);
+  }
+
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal modal--search" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-sticky">
+          <h3>Replace exercise</h3>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search or type a new one…"
+              autoFocus
+            />
+          </div>
+        </div>
+        <div className="modal-scroll">
+          {filtered.length === 0 && q.trim() ? (
+            <button className="btn primary" onClick={createAndPick}>+ Create "{q}" and replace</button>
+          ) : (
+            filtered.map((e) => (
+              <div className="list-row" key={e.id} onClick={() => pick(e.id)}>
+                <div className="meta"><span>💪</span> {e.name}</div>
+                <span style={{ color: 'var(--gray)' }}>⇄</span>
+              </div>
+            ))
+          )}
+        </div>
+        <button className="btn ghost mt-1" onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  );
+}
 
 function SaveAsTemplateModal({ sessionId, defaultName, onClose, reload }) {
   const [name, setName] = useState(defaultName);

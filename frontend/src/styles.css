@@ -592,3 +592,123 @@ a { color: inherit; text-decoration: none; }
 .prev-note-card--sm .prev-note-body {
   font-size: 13px;
 }
+
+/* ---------- Compact welcome bar (replaces the big centered card) ---------- */
+.welcome-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--peach-soft);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+.welcome-bar__name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  min-width: 0;
+}
+.welcome-bar__hi { font-size: 12px; color: var(--ink-soft); }
+.welcome-bar__user {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.welcome-bar__cta {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+/* ---------- Clickable calendar day ---------- */
+.calendar-grid .day.clickable {
+  cursor: pointer;
+}
+.calendar-grid .day.clickable:active { transform: scale(0.94); }
+
+.color-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* ---------- Note-with-adjust composite ---------- */
+.note-with-adjust {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+.note-with-adjust .note-area {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+  padding: 10px;
+  border: 1px solid var(--gray-soft);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--white);
+  color: var(--ink);
+}
+.note-with-adjust .note-area:focus {
+  outline: none;
+  border-color: var(--peach);
+}
+.adjust-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.adjust-btn {
+  width: 44px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.12s, box-shadow 0.12s, transform 0.05s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.adjust-btn.adjust-up {
+  background: #DDF5E5;
+  color: #2E8B57;
+}
+.adjust-btn.adjust-down {
+  background: #FCE0E0;
+  color: #B33A3A;
+}
+.adjust-btn.adjust-up.pressed {
+  background: #7FCD9A;
+  color: #1F5A38;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);
+}
+.adjust-btn.adjust-down.pressed {
+  background: #E88787;
+  color: #6E1F1F;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);
+}
+.adjust-btn:active { transform: scale(0.96); }
+
+/* ---------- Exercise card tinted from previous adjust ---------- */
+.exercise-block.exercise-block--prev-up {
+  background: linear-gradient(0deg, rgba(127,205,154,0.10), rgba(127,205,154,0.10)), var(--white);
+  border-color: rgba(127,205,154,0.35);
+}
+.exercise-block.exercise-block--prev-down {
+  background: linear-gradient(0deg, rgba(232,135,135,0.10), rgba(232,135,135,0.10)), var(--white);
+  border-color: rgba(232,135,135,0.35);
+}

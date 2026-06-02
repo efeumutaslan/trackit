@@ -152,6 +152,34 @@ function loadSession(userId, sessionId) {
     }
     ex.prev_exercise_notes = prevExN?.exercise_notes || '';
     ex.prev_exercise_notes_date = prevExN?.session_date || null;
+
+    // resolve the weight_adjust value from the most recent prior session of
+    // this exercise (same template preferred). Used by the frontend to tint
+    // the exercise card faint green/red so the user remembers the previous
+    // intent ("go heavier" / "back off") before logging this session.
+    let prevAdj = null;
+    if (s.template_id) {
+      prevAdj = db.prepare(`
+        SELECT se.weight_adjust FROM session_exercises se
+        JOIN workout_sessions ws ON ws.id = se.session_id
+        WHERE ws.user_id = ? AND se.exercise_id = ?
+          AND ws.template_id = ?
+          AND (ws.session_date, ws.created_at, ws.id) < (?, ?, ?)
+          AND COALESCE(se.weight_adjust,'') != ''
+        ORDER BY ws.session_date DESC, ws.created_at DESC, ws.id DESC LIMIT 1
+      `).get(userId, ex.exercise_id, s.template_id, s.session_date, s.created_at, s.id);
+    }
+    if (!prevAdj) {
+      prevAdj = db.prepare(`
+        SELECT se.weight_adjust FROM session_exercises se
+        JOIN workout_sessions ws ON ws.id = se.session_id
+        WHERE ws.user_id = ? AND se.exercise_id = ?
+          AND (ws.session_date, ws.created_at, ws.id) < (?, ?, ?)
+          AND COALESCE(se.weight_adjust,'') != ''
+        ORDER BY ws.session_date DESC, ws.created_at DESC, ws.id DESC LIMIT 1
+      `).get(userId, ex.exercise_id, s.session_date, s.created_at, s.id);
+    }
+    ex.prev_weight_adjust = prevAdj?.weight_adjust || '';
   }
   s.exercises = exercises;
   return s;
@@ -348,6 +376,62 @@ router.delete('/:id/exercises/:seId', (req, res) => {
     .get(id, req.userId);
   if (!cur) return res.status(404).json({ error: 'Not found' });
   db.prepare('DELETE FROM session_exercises WHERE id = ? AND session_id = ?').run(seId, id);
+  res.json({ ok: true });
+});
+
+// Reorder an exercise within a session: 'up' or 'down' swaps its order_idx
+// with the neighbouring exercise.
+router.post('/:id/exercises/:seId/move', (req, res) => {
+  const { id, seId } = req.params;
+  const dir = (req.body && req.body.direction) || 'up';
+  const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
+    .get(id, req.userId);
+  if (!cur) return res.status(404).json({ error: 'Not found' });
+  const me = db.prepare('SELECT * FROM session_exercises WHERE id = ? AND session_id = ?').get(seId, id);
+  if (!me) return res.status(404).json({ error: 'Exercise not found' });
+  const neighbour = dir === 'up'
+    ? db.prepare(`SELECT * FROM session_exercises WHERE session_id = ? AND order_idx < ? ORDER BY order_idx DESC LIMIT 1`).get(id, me.order_idx)
+    : db.prepare(`SELECT * FROM session_exercises WHERE session_id = ? AND order_idx > ? ORDER BY order_idx ASC LIMIT 1`).get(id, me.order_idx);
+  if (!neighbour) return res.json({ ok: true, swapped: false });
+  // swap order_idx via a temp value to avoid unique-ish constraint issues
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE session_exercises SET order_idx = ? WHERE id = ?').run(-1 - me.id, me.id);
+    db.prepare('UPDATE session_exercises SET order_idx = ? WHERE id = ?').run(me.order_idx, neighbour.id);
+    db.prepare('UPDATE session_exercises SET order_idx = ? WHERE id = ?').run(neighbour.order_idx, me.id);
+  });
+  tx();
+  res.json({ ok: true, swapped: true });
+});
+
+// Replace the exercise referenced by a session_exercise row with a different
+// exercise from the user's roster. Sets/notes/order are preserved.
+router.post('/:id/exercises/:seId/replace', (req, res) => {
+  const { id, seId } = req.params;
+  const newExerciseId = req.body && +req.body.exercise_id;
+  if (!newExerciseId) return res.status(400).json({ error: 'exercise_id required' });
+  const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
+    .get(id, req.userId);
+  if (!cur) return res.status(404).json({ error: 'Not found' });
+  const me = db.prepare('SELECT * FROM session_exercises WHERE id = ? AND session_id = ?').get(seId, id);
+  if (!me) return res.status(404).json({ error: 'Exercise not found' });
+  const newEx = db.prepare('SELECT * FROM exercises WHERE id = ? AND user_id = ?').get(newExerciseId, req.userId);
+  if (!newEx) return res.status(404).json({ error: 'Replacement exercise not found' });
+  // Resolve previous-note for the NEW exercise so the card is meaningful.
+  const newPrevNote = getPrevExerciseNotes(req.userId, newExerciseId, cur.session_date);
+  db.prepare(`
+    UPDATE session_exercises SET exercise_id = ?, prev_exercise_notes = ?, weight_adjust = NULL
+    WHERE id = ?
+  `).run(newExerciseId, newPrevNote, me.id);
+  // Also refresh set kg prefills for the new exercise (only if all sets are empty)
+  const sets = db.prepare('SELECT id, weight_kg FROM session_sets WHERE session_exercise_id = ? ORDER BY set_number').all(me.id);
+  const allEmpty = sets.every((s) => s.weight_kg == null);
+  if (allEmpty) {
+    const prevWeights = getPrevSetWeights(req.userId, newExerciseId, cur.template_id || null, cur.session_date, cur.id);
+    sets.forEach((s, i) => {
+      const w = prevWeights[i] != null ? prevWeights[i] : null;
+      if (w != null) db.prepare('UPDATE session_sets SET weight_kg = ? WHERE id = ?').run(w, s.id);
+    });
+  }
   res.json({ ok: true });
 });
 
