@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import Calendar from '../components/Calendar.jsx';
+import Heatmap from '../components/Heatmap.jsx';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 
@@ -17,6 +18,7 @@ export default function Home() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
   const [recent, setRecent] = useState([]);
+  const [view, setView] = useState('month'); // 'month' | 'year'
 
   useEffect(() => {
     api.get('/sessions').then((rows) => setRecent(rows.slice(0, 5))).catch(() => {});
@@ -27,13 +29,16 @@ export default function Home() {
       <TopBar
         brand
         right={
-          <button
-            className="right-action"
-            onClick={() => { logout(); nav('/login'); }}
-            title="Sign out"
-          >
-            Sign out
-          </button>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <Link className="right-action" to="/settings" title="Settings">⚙</Link>
+            <button
+              className="right-action"
+              onClick={() => { logout(); nav('/login'); }}
+              title="Sign out"
+            >
+              Sign out
+            </button>
+          </div>
         }
       />
       <div className="content">
@@ -45,8 +50,14 @@ export default function Home() {
           <Link to="/log" className="btn primary welcome-bar__cta">+ Log a workout</Link>
         </div>
 
-        <div className="section-title">Calendar</div>
-        <Calendar />
+        <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>{view === 'month' ? 'Calendar' : 'Year heatmap'}</span>
+          <div className="view-toggle">
+            <button className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>Month</button>
+            <button className={view === 'year' ? 'on' : ''} onClick={() => setView('year')}>Year</button>
+          </div>
+        </div>
+        {view === 'month' ? <Calendar /> : <Heatmap />}
 
         <div className="section-title">Recent sessions</div>
         {recent.length === 0 ? (

@@ -10,6 +10,8 @@ import Templates from './pages/Templates.jsx';
 import TemplateEdit from './pages/TemplateEdit.jsx';
 import Exercises from './pages/Exercises.jsx';
 import ExerciseEdit from './pages/ExerciseEdit.jsx';
+import Bodyweight from './pages/Bodyweight.jsx';
+import Settings from './pages/Settings.jsx';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -33,6 +35,8 @@ export default function App() {
         <Route path="/templates/:id" element={<TemplateEdit />} />
         <Route path="/exercises" element={<Exercises />} />
         <Route path="/exercises/:id" element={<ExerciseEdit />} />
+        <Route path="/bodyweight" element={<Bodyweight />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -41,8 +45,6 @@ export default function App() {
   );
 }
 
-// Hide the bottom nav while inside an active session so the user has the
-// whole viewport for logging sets without distractions.
 function ConditionalBottomNav() {
   const loc = useLocation();
   const inSession = matchPath('/sessions/:id', loc.pathname);

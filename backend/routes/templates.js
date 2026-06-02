@@ -60,12 +60,18 @@ router.post('/', (req, res) => {
   const finalColor = color && color.trim() ? color.trim() : pickUnusedColor(req.userId);
   const insertTmpl = db.prepare('INSERT INTO templates (user_id, name, color) VALUES (?, ?, ?)');
   const insertEx = db.prepare(
-    'INSERT INTO template_exercises (template_id, exercise_id, order_idx, target_sets, target_reps) VALUES (?, ?, ?, ?, ?)'
+    `INSERT INTO template_exercises
+       (template_id, exercise_id, order_idx, target_sets, target_reps, target_time_s, target_mileage_m)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
   const txn = db.transaction(() => {
     const info = insertTmpl.run(req.userId, name.trim(), finalColor);
     (exercises || []).forEach((ex, idx) => {
-      insertEx.run(info.lastInsertRowid, ex.exercise_id, idx, ex.target_sets || 3, ex.target_reps || '');
+      insertEx.run(
+        info.lastInsertRowid, ex.exercise_id, idx,
+        ex.target_sets || 3, ex.target_reps || '',
+        ex.target_time_s || null, ex.target_mileage_m || null
+      );
     });
     return info.lastInsertRowid;
   });
@@ -84,10 +90,16 @@ router.put('/:id', (req, res) => {
     if (Array.isArray(exercises)) {
       db.prepare('DELETE FROM template_exercises WHERE template_id = ?').run(id);
       const stmt = db.prepare(
-        'INSERT INTO template_exercises (template_id, exercise_id, order_idx, target_sets, target_reps) VALUES (?, ?, ?, ?, ?)'
+        `INSERT INTO template_exercises
+           (template_id, exercise_id, order_idx, target_sets, target_reps, target_time_s, target_mileage_m)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       );
       exercises.forEach((ex, idx) => {
-        stmt.run(id, ex.exercise_id, idx, ex.target_sets || 3, ex.target_reps || '');
+        stmt.run(
+          id, ex.exercise_id, idx,
+          ex.target_sets || 3, ex.target_reps || '',
+          ex.target_time_s || null, ex.target_mileage_m || null
+        );
       });
     }
   });
@@ -101,6 +113,35 @@ router.delete('/:id', (req, res) => {
   if (!t) return res.status(404).json({ error: 'Not found' });
   db.prepare('UPDATE templates SET archived = 1 WHERE id = ?').run(id);
   res.json({ ok: true });
+});
+
+// Clone a template under a new name; exercises and their targets are copied.
+router.post('/:id/clone', (req, res) => {
+  const id = req.params.id;
+  const newName = (req.body && req.body.name && req.body.name.trim()) || null;
+  const t = db.prepare('SELECT * FROM templates WHERE id = ? AND user_id = ? AND archived = 0').get(id, req.userId);
+  if (!t) return res.status(404).json({ error: 'Not found' });
+  const finalName = newName || `${t.name} copy`;
+  const color = pickUnusedColor(req.userId);
+  const ins = db.prepare('INSERT INTO templates (user_id, name, color) VALUES (?, ?, ?)');
+  const exins = db.prepare(
+    `INSERT INTO template_exercises
+       (template_id, exercise_id, order_idx, target_sets, target_reps, target_time_s, target_mileage_m)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  );
+  let newId;
+  db.transaction(() => {
+    const info = ins.run(req.userId, finalName, color);
+    newId = info.lastInsertRowid;
+    const source = db.prepare(
+      'SELECT * FROM template_exercises WHERE template_id = ? ORDER BY order_idx'
+    ).all(id);
+    source.forEach((ex, idx) => {
+      exins.run(newId, ex.exercise_id, idx, ex.target_sets, ex.target_reps,
+                ex.target_time_s, ex.target_mileage_m);
+    });
+  })();
+  res.json(db.prepare('SELECT * FROM templates WHERE id = ?').get(newId));
 });
 
 // Get the workout_note from the most recent session using this template

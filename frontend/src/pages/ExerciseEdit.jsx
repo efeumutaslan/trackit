@@ -17,13 +17,20 @@ export default function ExerciseEdit() {
   const nav = useNavigate();
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
+  const [groupId, setGroupId] = useState('');
+  const [groups, setGroups] = useState([]);
   const [progress, setProgress] = useState([]);
 
   useEffect(() => {
+    api.get('/groups').then(setGroups).catch(() => {});
     if (!isNew) {
       api.get('/exercises').then((rows) => {
         const ex = rows.find((r) => r.id === +id);
-        if (ex) { setName(ex.name); setNotes(ex.notes || ''); }
+        if (ex) {
+          setName(ex.name);
+          setNotes(ex.notes || '');
+          setGroupId(ex.group_id ? String(ex.group_id) : '');
+        }
       });
       api.get(`/exercises/${id}/progress`).then(setProgress).catch(() => {});
     }
@@ -31,10 +38,11 @@ export default function ExerciseEdit() {
 
   async function save() {
     if (!name.trim()) { alert('Name is required'); return; }
+    const body = { name: name.trim(), notes, group_id: groupId === '' ? null : +groupId };
     if (isNew) {
-      await api.post('/exercises', { name: name.trim(), notes });
+      await api.post('/exercises', body);
     } else {
-      await api.put(`/exercises/${id}`, { name: name.trim(), notes });
+      await api.put(`/exercises/${id}`, body);
     }
     nav('/exercises');
   }
@@ -57,6 +65,14 @@ export default function ExerciseEdit() {
           <div className="field">
             <label>Name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. DB OHP" />
+          </div>
+          <div className="field">
+            <label>Group</label>
+            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+              <option value="">— Ungrouped —</option>
+              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+            <div className="small text-muted mt-1">Create groups in Settings.</div>
           </div>
           <div className="field" style={{ marginBottom: 0 }}>
             <label>General notes (optional)</label>

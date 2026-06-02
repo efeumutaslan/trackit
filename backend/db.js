@@ -99,6 +99,66 @@ CREATE INDEX IF NOT EXISTS idx_session_ex_session ON session_exercises(session_i
 CREATE INDEX IF NOT EXISTS idx_session_ex_exercise ON session_exercises(exercise_id);
 CREATE INDEX IF NOT EXISTS idx_sets_session_ex ON session_sets(session_exercise_id);
 CREATE INDEX IF NOT EXISTS idx_auth_user ON sessions_auth(user_id);
+
+-- ── Exercise grouping (folders, optional) ──────────────────────────
+CREATE TABLE IF NOT EXISTS exercise_groups (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     INTEGER NOT NULL,
+  name        TEXT NOT NULL,
+  archived    INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE (user_id, name)
+);
+
+-- ── Bodyweight log ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS bodyweight (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       INTEGER NOT NULL,
+  log_date      TEXT NOT NULL,
+  weight_kg     REAL NOT NULL,
+  note          TEXT DEFAULT '',
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_bw_user_date ON bodyweight(user_id, log_date);
 `);
+
+// ── Incremental migrations for existing DBs (add columns if missing) ──
+function colExists(table, col) {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all();
+  return rows.some((r) => r.name === col);
+}
+function addCol(table, col, def) {
+  if (!colExists(table, col)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+  }
+}
+
+// Exercise grouping (nullable FK)
+addCol('exercises', 'group_id', 'INTEGER REFERENCES exercise_groups(id) ON DELETE SET NULL');
+
+// Superset grouping per session-exercise (nullable text tag like 'A','B')
+addCol('session_exercises', 'superset_tag', "TEXT DEFAULT ''");
+
+// Mood emoji + workout duration goal-related (per workout_session)
+addCol('workout_sessions', 'mood', "TEXT DEFAULT ''");
+
+// Rest timer preference (seconds) per session_exercise; null = default 90
+addCol('session_exercises', 'rest_seconds', 'INTEGER');
+
+// Time / mileage targets on the SE level
+addCol('session_exercises', 'target_time_s', 'INTEGER');
+addCol('session_exercises', 'target_mileage_m', 'INTEGER');
+
+// Per-set time/mileage actuals AND per-set target overrides
+addCol('session_sets', 'time_seconds',     'INTEGER');
+addCol('session_sets', 'mileage_m',        'INTEGER');
+addCol('session_sets', 'target_time_s',    'INTEGER');
+addCol('session_sets', 'target_mileage_m', 'INTEGER');
+
+// Template-level targets for time/mileage (mirrors session level)
+addCol('template_exercises', 'target_time_s',    'INTEGER');
+addCol('template_exercises', 'target_mileage_m', 'INTEGER');
 
 console.log('DB ready:', DB_PATH);

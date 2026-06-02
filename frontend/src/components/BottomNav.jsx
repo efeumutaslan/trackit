@@ -19,6 +19,10 @@ export default function BottomNav() {
         <span className="icon">💪</span>
         <span>Exercises</span>
       </NavLink>
+      <NavLink to="/bodyweight">
+        <span className="icon">⚖️</span>
+        <span>Body</span>
+      </NavLink>
     </nav>
   );
 }

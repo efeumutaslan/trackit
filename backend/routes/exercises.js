@@ -7,18 +7,24 @@ router.use(authMiddleware);
 
 router.get('/', (req, res) => {
   const rows = db
-    .prepare('SELECT * FROM exercises WHERE user_id = ? AND archived = 0 ORDER BY name')
+    .prepare(`
+      SELECT e.*, g.name AS group_name
+      FROM exercises e
+      LEFT JOIN exercise_groups g ON g.id = e.group_id
+      WHERE e.user_id = ? AND e.archived = 0
+      ORDER BY g.name IS NULL, g.name, e.name
+    `)
     .all(req.userId);
   res.json(rows);
 });
 
 router.post('/', (req, res) => {
-  const { name, notes } = req.body || {};
+  const { name, notes, group_id } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
   try {
     const info = db
-      .prepare('INSERT INTO exercises (user_id, name, notes) VALUES (?, ?, ?)')
-      .run(req.userId, name.trim(), notes || '');
+      .prepare('INSERT INTO exercises (user_id, name, notes, group_id) VALUES (?, ?, ?, ?)')
+      .run(req.userId, name.trim(), notes || '', group_id || null);
     const row = db.prepare('SELECT * FROM exercises WHERE id = ?').get(info.lastInsertRowid);
     res.json(row);
   } catch (e) {
@@ -30,12 +36,13 @@ router.post('/', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
-  const { name, notes } = req.body || {};
+  const { name, notes, group_id } = req.body || {};
   const id = req.params.id;
   const ex = db.prepare('SELECT * FROM exercises WHERE id = ? AND user_id = ?').get(id, req.userId);
   if (!ex) return res.status(404).json({ error: 'Not found' });
-  db.prepare('UPDATE exercises SET name = ?, notes = ? WHERE id = ?')
-    .run(name?.trim() || ex.name, notes ?? ex.notes, id);
+  db.prepare('UPDATE exercises SET name = ?, notes = ?, group_id = ? WHERE id = ?')
+    .run(name?.trim() || ex.name, notes ?? ex.notes,
+         group_id !== undefined ? group_id : ex.group_id, id);
   res.json(db.prepare('SELECT * FROM exercises WHERE id = ?').get(id));
 });
 
