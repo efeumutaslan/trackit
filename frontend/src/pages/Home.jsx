@@ -44,7 +44,6 @@ export default function Home() {
       <div className="content">
         <div className="welcome-bar">
           <div className="welcome-bar__name">
-            <span className="welcome-bar__hi">Hi,</span>
             <span className="welcome-bar__user">{user?.username}</span>
           </div>
           <Link to="/log" className="btn primary welcome-bar__cta">+ Log a workout</Link>

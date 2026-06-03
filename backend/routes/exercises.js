@@ -10,7 +10,7 @@ router.get('/', (req, res) => {
     .prepare(`
       SELECT e.*, g.name AS group_name
       FROM exercises e
-      LEFT JOIN exercise_groups g ON g.id = e.group_id
+      LEFT JOIN exercise_groups g ON g.id = e.group_id AND g.archived = 0
       WHERE e.user_id = ? AND e.archived = 0
       ORDER BY g.name IS NULL, g.name, e.name
     `)

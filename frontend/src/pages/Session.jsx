@@ -59,6 +59,16 @@ export default function Session() {
   const [restEnd, setRestEnd] = useState(null); // epoch ms when timer ends, or null
   const [restTotal, setRestTotal] = useState(0); // total seconds for progress bar
   const [, setTick] = useState(0); // forces a re-render each second while timer runs
+  // User-level preferences (sound, vibration, rep-input behaviour). Loaded
+  // once for the page; cached and passed down to every ExerciseBlock.
+  const [settings, setSettings] = useState({
+    rep_placeholder_mode: 'empty',
+    rest_timer_sound: 1,
+    rest_timer_vibrate: 1,
+  });
+  useEffect(() => {
+    api.get('/settings').then(setSettings).catch(() => {});
+  }, []);
 
   const load = useCallback(() => {
     api.get(`/sessions/${id}`).then(setS).catch(() => nav('/sessions'));
@@ -73,22 +83,27 @@ export default function Session() {
     if (!restEnd) return undefined;
     const t = setInterval(() => {
       if (Date.now() >= restEnd) {
-        try {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          const o = ctx.createOscillator();
-          const g = ctx.createGain();
-          o.connect(g); g.connect(ctx.destination);
-          o.frequency.value = 880; g.gain.value = 0.25;
-          o.start(); o.stop(ctx.currentTime + 0.25);
-        } catch { /* audio unavailable */ }
-        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        // Beep only if the user has sound enabled in settings.
+        if (settings.rest_timer_sound) {
+          try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.frequency.value = 880; g.gain.value = 0.25;
+            o.start(); o.stop(ctx.currentTime + 0.25);
+          } catch { /* audio unavailable */ }
+        }
+        if (settings.rest_timer_vibrate && navigator.vibrate) {
+          navigator.vibrate([200, 100, 200]);
+        }
         setRestEnd(null);
       } else {
         setTick((n) => n + 1);
       }
     }, 250);
     return () => clearInterval(t);
-  }, [restEnd]);
+  }, [restEnd, settings.rest_timer_sound, settings.rest_timer_vibrate]);
 
   function startRest(seconds) {
     if (!seconds || seconds <= 0) return;
@@ -142,6 +157,23 @@ export default function Session() {
               value={s.session_date}
               onChange={(e) => saveMeta({ session_date: e.target.value })}
             />
+          </div>
+
+          {/* Display mode: collapsed accordion (Expandable, default) vs.
+              always-open (Fixed). Persisted on the session itself, so the
+              choice survives navigating away and coming back. */}
+          <div className="field">
+            <label>Display</label>
+            <div className="seg-group">
+              <button
+                className={`seg-btn${s.expand_mode !== 'fixed' ? ' on' : ''}`}
+                onClick={() => saveMeta({ expand_mode: 'expandable' })}
+              >Expandable</button>
+              <button
+                className={`seg-btn${s.expand_mode === 'fixed' ? ' on' : ''}`}
+                onClick={() => saveMeta({ expand_mode: 'fixed' })}
+              >Fixed</button>
+            </div>
           </div>
           <div className="row">
             <button
@@ -218,16 +250,40 @@ export default function Session() {
         </div>
 
         <div className="section-title">Exercises</div>
-        {s.exercises.map((ex) => (
-          <ExerciseBlock
-            key={ex.id}
-            sessionId={s.id}
-            ex={ex}
-            reload={load}
-            sessionDate={s.session_date}
-            onAfterRestSet={startRest}
-          />
-        ))}
+        {s.exercises.map((ex, idx) => {
+          // A run of consecutive exercises sharing the same superset_tag
+          // forms a visual cluster — the first card has rounded top, the
+          // last has rounded bottom, the middle ones are flush. Empty
+          // tags ('' or null) never cluster, even with each other.
+          const tag = ex.superset_tag || '';
+          const prevTag = idx > 0 ? (s.exercises[idx - 1].superset_tag || '') : '';
+          const nextTag = idx < s.exercises.length - 1
+            ? (s.exercises[idx + 1].superset_tag || '')
+            : '';
+          let supersetPos = 'none';
+          if (tag) {
+            const inRun = (t1, t2) => t1 && t2 && t1 === t2;
+            const startsRun = inRun(tag, nextTag) && !inRun(tag, prevTag);
+            const endsRun   = inRun(tag, prevTag) && !inRun(tag, nextTag);
+            const midRun    = inRun(tag, prevTag) && inRun(tag, nextTag);
+            if (startsRun)      supersetPos = 'top';
+            else if (midRun)    supersetPos = 'mid';
+            else if (endsRun)   supersetPos = 'bot';
+          }
+          return (
+            <ExerciseBlock
+              key={ex.id}
+              sessionId={s.id}
+              ex={ex}
+              reload={load}
+              sessionDate={s.session_date}
+              onAfterRestSet={startRest}
+              expandMode={s.expand_mode || 'expandable'}
+              settings={settings}
+              supersetPos={supersetPos}
+            />
+          );
+        })}
 
         <button className="btn mt-1" onClick={() => setShowAddEx(true)}>+ Add exercise</button>
 
@@ -268,7 +324,8 @@ export default function Session() {
   );
 }
 
-function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet }) {
+function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
+                        expandMode, settings, supersetPos }) {
   const [notes, setNotes] = useState(ex.exercise_notes || '');
   const [adjust, setAdjust] = useState(ex.weight_adjust || '');
   const [targetReps, setTargetReps] = useState(ex.target_reps || '');
@@ -278,6 +335,18 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet }) {
   const [restSecs, setRestSecs] = useState(ex.rest_seconds ?? '');
   const [showReplace, setShowReplace] = useState(false);
   const [showTargets, setShowTargets] = useState(false);
+  // Accordion: in 'expandable' mode the card starts collapsed and only
+  // shows the head. In 'fixed' mode it's always open. Per-card local state
+  // so the user can open/close individually within an expandable session.
+  const [expanded, setExpanded] = useState(expandMode === 'fixed');
+  const isCollapsed = expandMode === 'expandable' && !expanded;
+
+  // A/B alternate exercise — show the name of whichever one is currently
+  // active (primary or alt). User toggles via the A|B segmented control.
+  const hasAlt = !!ex.alt_exercise_id && !!ex.alt_exercise_name;
+  const activeName = (hasAlt && ex.alt_active)
+    ? ex.alt_exercise_name
+    : ex.exercise_name;
 
   // Determine which columns the SET rows should show. KG is always shown.
   // TIME/MILEAGE are shown if there's an exercise-level OR any set-level target,
@@ -334,19 +403,65 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet }) {
 
   const cardClass =
     'card exercise-block' +
-    (ex.prev_weight_adjust === 'up' ? ' exercise-block--prev-up' :
-     ex.prev_weight_adjust === 'down' ? ' exercise-block--prev-down' : '');
+    (ex.prev_weight_adjust === 'up'   ? ' exercise-block--prev-up'   : '') +
+    (ex.prev_weight_adjust === 'down' ? ' exercise-block--prev-down' : '') +
+    (supersetPos === 'top' ? ' superset-top' :
+     supersetPos === 'mid' ? ' superset-mid' :
+     supersetPos === 'bot' ? ' superset-bot' : '') +
+    (isCollapsed ? ' is-collapsed' : '');
+
+  // For the header summary line shown when the card is collapsed (gives
+  // the user a glance at sets x reps @ weight without expanding).
+  const summary = (() => {
+    const reps = ex.sets.map((st) => st.reps_done).filter((x) => x != null);
+    const ws   = ex.sets.map((st) => st.weight_kg).filter((x) => x != null);
+    if (!reps.length && !ws.length) return null;
+    const repsTxt = reps.length ? reps.join(' / ') : '–';
+    const wMin = ws.length ? Math.min(...ws) : null;
+    const wMax = ws.length ? Math.max(...ws) : null;
+    const wTxt = ws.length
+      ? (wMin === wMax ? `${wMin} kg` : `${wMin}–${wMax} kg`)
+      : '';
+    return `${repsTxt}${wTxt ? '  @  ' + wTxt : ''}`;
+  })();
 
   return (
     <div className={cardClass}>
-      <div className="exercise-head">
-        <h4 style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-          {ex.superset_tag && (
-            <span className="superset-badge">{ex.superset_tag}</span>
+      <div
+        className="exercise-head"
+        onClick={(e) => {
+          // Clicking the head toggles only when in expandable mode and
+          // not clicking on an action button.
+          if (expandMode !== 'expandable') return;
+          if (e.target.closest('button')) return;
+          setExpanded((v) => !v);
+        }}
+        style={{ cursor: expandMode === 'expandable' ? 'pointer' : 'default' }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h4 style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {ex.superset_tag && <span className="superset-badge">{ex.superset_tag}</span>}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeName}</span>
+            {hasAlt && (
+              <span className="alt-toggle" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className={`alt-toggle__btn${!ex.alt_active ? ' on' : ''}`}
+                  onClick={() => api.put(`/sessions/${sessionId}/exercises/${ex.id}`, { alt_active: 0 }).then(reload)}
+                  title={ex.exercise_name}
+                >A</button>
+                <button
+                  className={`alt-toggle__btn${ex.alt_active ? ' on' : ''}`}
+                  onClick={() => api.put(`/sessions/${sessionId}/exercises/${ex.id}`, { alt_active: 1 }).then(reload)}
+                  title={ex.alt_exercise_name}
+                >B</button>
+              </span>
+            )}
+          </h4>
+          {isCollapsed && summary && (
+            <div className="small text-muted exercise-head__summary">{summary}</div>
           )}
-          <span>{ex.exercise_name}</span>
-        </h4>
-        <div style={{ display: 'flex', gap: 4 }}>
+        </div>
+        <div className="exercise-head__actions" style={{ display: 'flex', gap: 4 }}>
           <button className="btn tiny ghost" onClick={() => setShowTargets((v) => !v)} title="Targets / superset / rest">⚙</button>
           <button className="btn tiny ghost" onClick={() => move('up')} title="Move up">↑</button>
           <button className="btn tiny ghost" onClick={() => move('down')} title="Move down">↓</button>
@@ -355,166 +470,178 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet }) {
         </div>
       </div>
 
-      {/* Previous exercise note — placed right below the exercise name */}
-      {ex.prev_exercise_notes && (
-        <div className="prev-note-card prev-note-card--sm" style={{ marginBottom: 10 }}>
-          <div className="prev-note-head">
-            <span className="prev-note-icon">📜</span>
-            <span className="prev-note-label">Previous exercise note</span>
-            {ex.prev_exercise_notes_date && (
-              <span className="prev-note-date">{fmtDate(ex.prev_exercise_notes_date)}</span>
-            )}
+      {/* Body — hidden when card is collapsed (CSS handles it) */}
+      <div className="exercise-body">
+        {/* Previous exercise note — placed right below the exercise name */}
+        {ex.prev_exercise_notes && (
+          <div className="prev-note-card prev-note-card--sm" style={{ marginBottom: 10 }}>
+            <div className="prev-note-head">
+              <span className="prev-note-icon">📜</span>
+              <span className="prev-note-label">Previous exercise note</span>
+              {ex.prev_exercise_notes_date && (
+                <span className="prev-note-date">{fmtDate(ex.prev_exercise_notes_date)}</span>
+              )}
+            </div>
+            <div className="prev-note-body">{ex.prev_exercise_notes}</div>
           </div>
-          <div className="prev-note-body">{ex.prev_exercise_notes}</div>
-        </div>
-      )}
+        )}
 
-      <div className="row mb-1">
-        <div>
-          <label className="small" style={{ color: 'var(--ink-soft)' }}>Target rep range</label>
-          <input
-            value={targetReps}
-            onChange={(e) => setTargetReps(e.target.value)}
-            onBlur={() => saveMeta({ target_reps: targetReps })}
-            placeholder="e.g. 6-10"
-          />
-        </div>
-        <div>
-          <label className="small" style={{ color: 'var(--ink-soft)' }}>Tonnage</label>
-          <div className="tonnage-line" style={{ padding: '10px 0' }}>
-            <span className="tag">{ex.tonnage.toFixed(1)} kg</span>
-            {ex.prev_tonnage > 0 && (
-              <span className="tag muted">Previous: {ex.prev_tonnage.toFixed(1)}</span>
-            )}
+        <div className="row mb-1">
+          <div>
+            <label className="small" style={{ color: 'var(--ink-soft)' }}>Target rep range</label>
+            <input
+              value={targetReps}
+              onChange={(e) => setTargetReps(e.target.value)}
+              onBlur={() => saveMeta({ target_reps: targetReps })}
+              placeholder="e.g. 6-10"
+            />
+          </div>
+          <div>
+            <label className="small" style={{ color: 'var(--ink-soft)' }}>Tonnage</label>
+            <div className="tonnage-line" style={{ padding: '10px 0' }}>
+              <span className="tag">{ex.tonnage.toFixed(1)} kg</span>
+              {ex.prev_tonnage > 0 && (
+                <span className="tag muted">Previous: {ex.prev_tonnage.toFixed(1)}</span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Targets panel — collapsed by default; opens with ⚙ */}
-      {showTargets && (
-        <div className="targets-panel">
-          <div className="row mb-1">
-            <div>
-              <label className="small" style={{ color: 'var(--ink-soft)' }}>Target time (HH:MM:SS)</label>
-              <input
-                value={targetTime}
-                onChange={(e) => setTargetTime(e.target.value.replace(/[^0-9:]/g, ''))}
-                onBlur={saveTargets}
-                placeholder="00:10:00"
-              />
+        {/* Targets panel — collapsed by default; opens with ⚙ */}
+        {showTargets && (
+          <div className="targets-panel">
+            <div className="row mb-1">
+              <div>
+                <label className="small" style={{ color: 'var(--ink-soft)' }}>Target time (HH:MM:SS)</label>
+                <input
+                  value={targetTime}
+                  onChange={(e) => setTargetTime(e.target.value.replace(/[^0-9:]/g, ''))}
+                  onBlur={saveTargets}
+                  placeholder="00:10:00"
+                />
+              </div>
+              <div>
+                <label className="small" style={{ color: 'var(--ink-soft)' }}>Target distance (m)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={targetMileage}
+                  onChange={(e) => setTargetMileage(e.target.value.replace(/[^0-9]/g, ''))}
+                  onBlur={saveTargets}
+                  placeholder="2400"
+                />
+              </div>
             </div>
-            <div>
-              <label className="small" style={{ color: 'var(--ink-soft)' }}>Target distance (m)</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={targetMileage}
-                onChange={(e) => setTargetMileage(e.target.value.replace(/[^0-9]/g, ''))}
-                onBlur={saveTargets}
-                placeholder="2400"
-              />
+            <div className="row mb-1">
+              <div>
+                <label className="small" style={{ color: 'var(--ink-soft)' }}>Rest (sec)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={restSecs}
+                  onChange={(e) => setRestSecs(e.target.value.replace(/[^0-9]/g, ''))}
+                  onBlur={saveTargets}
+                  placeholder="90"
+                />
+              </div>
+              <div>
+                <label className="small" style={{ color: 'var(--ink-soft)' }}>Superset tag (A, B…)</label>
+                <input
+                  value={supersetTag}
+                  onChange={(e) => setSupersetTag(e.target.value.toUpperCase().slice(0, 2))}
+                  onBlur={saveTargets}
+                  placeholder="A"
+                />
+              </div>
             </div>
+            <AltExerciseInline
+              sessionId={sessionId}
+              seId={ex.id}
+              currentExerciseId={ex.exercise_id}
+              currentAltId={ex.alt_exercise_id}
+              currentAltName={ex.alt_exercise_name}
+              reload={reload}
+            />
           </div>
-          <div className="row">
-            <div>
-              <label className="small" style={{ color: 'var(--ink-soft)' }}>Rest (sec)</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={restSecs}
-                onChange={(e) => setRestSecs(e.target.value.replace(/[^0-9]/g, ''))}
-                onBlur={saveTargets}
-                placeholder="90"
-              />
-            </div>
-            <div>
-              <label className="small" style={{ color: 'var(--ink-soft)' }}>Superset tag (A, B…)</label>
-              <input
-                value={supersetTag}
-                onChange={(e) => setSupersetTag(e.target.value.toUpperCase().slice(0, 2))}
-                onBlur={saveTargets}
-                placeholder="A"
-              />
-            </div>
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* Set rows */}
-      <div className="set-row-header">
-        <div className="text-center">SET</div>
-        {showCols.kg && <div className="text-center">KG</div>}
-        {showCols.rep && <div className="text-center">REP</div>}
-        <div />
-      </div>
-      {(showCols.time || showCols.mileage) && (
-        <div className="set-row-header set-row-header--time">
+        {/* Set rows */}
+        <div className="set-row-header">
+          <div className="text-center">SET</div>
+          {showCols.kg && <div className="text-center">KG</div>}
+          {showCols.rep && <div className="text-center">REP</div>}
           <div />
-          {showCols.time    && <div className="text-center">TIME</div>}
-          {showCols.mileage && <div className="text-center">DIST (m)</div>}
-          <div />
         </div>
-      )}
-      {ex.sets.map((set, idx) => (
-        <SetRow
-          key={set.id}
-          sessionId={sessionId}
-          set={set}
-          showCols={showCols}
-          targets={{
-            target_reps:     ex.target_reps,
-            target_time_s:   ex.target_time_s,
-            target_mileage_m:ex.target_mileage_m,
-          }}
-          onSaved={async (evt) => {
-            if (evt && evt.kind === 'kg') {
-              const newW = evt.newW;
-              const prevW = set.weight_kg;
-              if (newW !== prevW) {
-                const targets = ex.sets.slice(idx + 1);
-                if (targets.length > 0) {
-                  await Promise.all(
-                    targets.map((s) =>
-                      api.put(`/sessions/${sessionId}/sets/${s.id}`, {
-                        weight_kg: newW,
-                        reps_done: s.reps_done,
-                      })
-                    )
-                  );
+        {(showCols.time || showCols.mileage) && (
+          <div className="set-row-header set-row-header--time">
+            <div />
+            {showCols.time    && <div className="text-center">TIME</div>}
+            {showCols.mileage && <div className="text-center">DIST (m)</div>}
+            <div />
+          </div>
+        )}
+        {ex.sets.map((set, idx) => (
+          <SetRow
+            key={set.id}
+            sessionId={sessionId}
+            set={set}
+            showCols={showCols}
+            targets={{
+              target_reps:     ex.target_reps,
+              target_time_s:   ex.target_time_s,
+              target_mileage_m:ex.target_mileage_m,
+            }}
+            prevReps={Array.isArray(ex.prev_set_reps) ? ex.prev_set_reps[idx] : null}
+            repPlaceholderMode={settings?.rep_placeholder_mode || 'empty'}
+            onSaved={async (evt) => {
+              if (evt && evt.kind === 'kg') {
+                const newW = evt.newW;
+                const prevW = set.weight_kg;
+                if (newW !== prevW) {
+                  const targets = ex.sets.slice(idx + 1);
+                  if (targets.length > 0) {
+                    await Promise.all(
+                      targets.map((s) =>
+                        api.put(`/sessions/${sessionId}/sets/${s.id}`, {
+                          weight_kg: newW,
+                          reps_done: s.reps_done,
+                        })
+                      )
+                    );
+                  }
                 }
+                if (onAfterRestSet && ex.rest_seconds) onAfterRestSet(ex.rest_seconds);
               }
-              // Trigger rest timer on the parent.
-              if (onAfterRestSet && ex.rest_seconds) onAfterRestSet(ex.rest_seconds);
-            }
-            if (evt && (evt.kind === 'rep' || evt.kind === 'time' || evt.kind === 'mileage')) {
-              if (onAfterRestSet && ex.rest_seconds) onAfterRestSet(ex.rest_seconds);
-            }
-            reload();
-          }}
-        />
-      ))}
-      <button className="btn ghost tiny mt-1" onClick={addSet}>+ Add set</button>
+              if (evt && (evt.kind === 'rep' || evt.kind === 'time' || evt.kind === 'mileage')) {
+                if (onAfterRestSet && ex.rest_seconds) onAfterRestSet(ex.rest_seconds);
+              }
+              reload();
+            }}
+          />
+        ))}
+        <button className="btn ghost tiny mt-1" onClick={addSet}>+ Add set</button>
 
-      {/* Note area: narrower textarea on the left, vertical adjust buttons on the right */}
-      <div className="note-with-adjust mt-2">
-        <textarea
-          className="note-area"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          onBlur={() => saveMeta()}
-          placeholder="Note about this exercise…"
-        />
-        <div className="adjust-stack">
-          <button
-            className={`adjust-btn adjust-up${adjust === 'up' ? ' pressed' : ''}`}
-            onClick={() => setAdjustValue('up')}
-            title="Plan to go heavier next time"
-          >▲</button>
-          <button
-            className={`adjust-btn adjust-down${adjust === 'down' ? ' pressed' : ''}`}
-            onClick={() => setAdjustValue('down')}
-            title="Plan to back off next time"
-          >▼</button>
+        {/* Note area: narrower textarea on the left, vertical adjust buttons on the right */}
+        <div className="note-with-adjust mt-2">
+          <textarea
+            className="note-area"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onBlur={() => saveMeta()}
+            placeholder="Note about this exercise…"
+          />
+          <div className="adjust-stack">
+            <button
+              className={`adjust-btn adjust-up${adjust === 'up' ? ' pressed' : ''}`}
+              onClick={() => setAdjustValue('up')}
+              title="Plan to go heavier next time"
+            >▲</button>
+            <button
+              className={`adjust-btn adjust-down${adjust === 'down' ? ' pressed' : ''}`}
+              onClick={() => setAdjustValue('down')}
+              title="Plan to back off next time"
+            >▼</button>
+          </div>
         </div>
       </div>
 
@@ -531,7 +658,75 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet }) {
   );
 }
 
-function SetRow({ sessionId, set, onSaved, showCols, targets }) {
+// Inline picker for the A/B alternate exercise — lives inside the ⚙
+// targets panel. A small searchable list; selecting an exercise sets
+// alt_exercise_id and reloads. Clearing it removes the alternate.
+function AltExerciseInline({ sessionId, seId, currentExerciseId, currentAltId, currentAltName, reload }) {
+  const [roster, setRoster] = useState([]);
+  const [q, setQ] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (pickerOpen) api.get('/exercises').then(setRoster).catch(() => {});
+  }, [pickerOpen]);
+
+  const normalize = (s) =>
+    (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const nq = normalize(q);
+  const filtered = roster
+    .filter((e) => e.id !== currentExerciseId)
+    .filter((e) => normalize(e.name).includes(nq))
+    .slice(0, 8);
+
+  async function pick(id) {
+    await api.put(`/sessions/${sessionId}/exercises/${seId}`, { alt_exercise_id: id });
+    setPickerOpen(false);
+    setQ('');
+    reload();
+  }
+  async function clearAlt() {
+    await api.put(`/sessions/${sessionId}/exercises/${seId}`, { alt_exercise_id: null, alt_active: 0 });
+    reload();
+  }
+
+  return (
+    <div className="alt-picker">
+      <label className="small" style={{ color: 'var(--ink-soft)' }}>Alternate exercise (B)</label>
+      {currentAltId && !pickerOpen ? (
+        <div className="row" style={{ alignItems: 'center' }}>
+          <div className="alt-current">💪 {currentAltName}</div>
+          <button className="btn tiny ghost" onClick={() => setPickerOpen(true)}>Change</button>
+          <button className="btn tiny ghost" onClick={clearAlt}>Remove</button>
+        </div>
+      ) : pickerOpen ? (
+        <div>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search…"
+            autoFocus
+          />
+          <div className="alt-picker__list">
+            {filtered.map((e) => (
+              <div key={e.id} className="alt-picker__row" onClick={() => pick(e.id)}>
+                <span>💪 {e.name}</span>
+                <span style={{ color: 'var(--gray)' }}>+</span>
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="small text-muted" style={{ padding: 8 }}>No matches</div>
+            )}
+          </div>
+          <button className="btn tiny ghost mt-1" onClick={() => { setPickerOpen(false); setQ(''); }}>Cancel</button>
+        </div>
+      ) : (
+        <button className="btn ghost tiny" onClick={() => setPickerOpen(true)}>+ Add an alternate</button>
+      )}
+    </div>
+  );
+}
+
+function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, repPlaceholderMode }) {
   // showCols = {kg, time, mileage, rep} — boolean. At least one is always true.
   // targets = optional { target_time_s, target_mileage_m } (from SE level) to
   // visually highlight cells that have a goal.
@@ -613,7 +808,7 @@ function SetRow({ sessionId, set, onSaved, showCols, targets }) {
         <div className="set-num">{set.set_number}</div>
         {showCols?.kg && (
           <div className="set-kg-wrap">
-            <button className="kg-bump" onClick={() => bumpKg(-2.5)} title="-2.5 kg">−</button>
+            <button className="kg-bump" onClick={() => bumpKg(2.5)} title="+2.5 kg">+</button>
             <input
               type="text"
               inputMode="decimal"
@@ -623,19 +818,26 @@ function SetRow({ sessionId, set, onSaved, showCols, targets }) {
               onBlur={saveKg}
               placeholder="-"
             />
-            <button className="kg-bump" onClick={() => bumpKg(2.5)} title="+2.5 kg">+</button>
+            <button className="kg-bump" onClick={() => bumpKg(-2.5)} title="-2.5 kg">−</button>
           </div>
         )}
         {showCols?.rep && (
           <input
             type="text"
             inputMode="numeric"
-            className={targets?.target_reps ? 'has-target' : ''}
+            className={
+              (targets?.target_reps ? 'has-target' : '') +
+              ((repPlaceholderMode === 'previous' && prevReps != null && r === '') ? ' has-prev-hint' : '')
+            }
             value={r}
             onFocus={selectAll}
             onChange={(e) => setR(e.target.value.replace(/[^0-9]/g, ''))}
             onBlur={saveReps}
-            placeholder="-"
+            placeholder={
+              repPlaceholderMode === 'previous' && prevReps != null
+                ? String(prevReps)
+                : '-'
+            }
           />
         )}
         <button className="del" onClick={del}>×</button>
@@ -690,8 +892,7 @@ function AddExerciseModal({ sessionId, onClose, reload }) {
   }, []);
 
   // Accent- and case-insensitive search. "kurek" matches "Kürek Çekme",
-  // "GOKDELEN" matches "gökdelen", etc. NFD-decomposes both sides and
-  // strips combining marks before comparing.
+  // "GOKDELEN" matches "gökdelen", etc.
   const normalize = (s) =>
     (s || '')
       .toString()
@@ -700,6 +901,9 @@ function AddExerciseModal({ sessionId, onClose, reload }) {
       .replace(/[\u0300-\u036f]/g, '');
   const nq = normalize(q);
   const filtered = roster.filter((e) => normalize(e.name).includes(nq));
+  // An exact name match means the user is just searching the existing
+  // entry — no point offering to "+ Create" a duplicate.
+  const exactMatch = roster.some((e) => normalize(e.name) === nq && nq !== '');
 
   // Group the filtered roster by group_name for display.
   const grouped = filtered.reduce((acc, e) => {
@@ -708,6 +912,18 @@ function AddExerciseModal({ sessionId, onClose, reload }) {
     acc[k].push(e);
     return acc;
   }, {});
+
+  // Allow creating a new group inline without leaving the modal.
+  async function createGroupInline() {
+    const name = prompt('New group name:');
+    if (!name || !name.trim()) return;
+    try {
+      const g = await api.post('/groups', { name: name.trim() });
+      const list = await api.get('/groups');
+      setGroups(list);
+      setNewExGroup(String(g.id));
+    } catch (e) { alert(e.message || String(e)); }
+  }
 
   async function add(exerciseId) {
     await api.post(`/sessions/${sessionId}/exercises`, {
@@ -774,33 +990,45 @@ function AddExerciseModal({ sessionId, onClose, reload }) {
           </div>
         </div>
         <div className="modal-scroll">
-          {filtered.length === 0 && q.trim() ? (
-            <>
-              {groups.length > 0 && (
-                <div className="field" style={{ marginBottom: 8 }}>
-                  <label className="small" style={{ color: 'var(--ink-soft)' }}>Add new exercise to group (optional)</label>
-                  <select value={newExGroup} onChange={(e) => setNewExGroup(e.target.value)}>
-                    <option value="">— Ungrouped —</option>
-                    {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                  </select>
-                </div>
-              )}
-              <button className="btn primary" onClick={createAndAdd}>+ Create "{q}" and add</button>
-            </>
-          ) : (
-            Object.entries(grouped).map(([groupName, list]) => (
-              <div key={groupName}>
-                <div className="small text-muted" style={{ padding: '6px 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  {groupName}
-                </div>
-                {list.map((e) => (
-                  <div className="list-row" key={e.id} onClick={() => add(e.id)}>
-                    <div className="meta"><span>💪</span> {e.name}</div>
-                    <span style={{ color: 'var(--gray)' }}>+</span>
-                  </div>
-                ))}
+          {/* Existing roster — searchable, grouped */}
+          {Object.entries(grouped).map(([groupName, list]) => (
+            <div key={groupName}>
+              <div className="small text-muted" style={{ padding: '6px 4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                {groupName}
               </div>
-            ))
+              {list.map((e) => (
+                <div className="list-row" key={e.id} onClick={() => add(e.id)}>
+                  <div className="meta"><span>💪</span> {e.name}</div>
+                  <span style={{ color: 'var(--gray)' }}>+</span>
+                </div>
+              ))}
+            </div>
+          ))}
+
+          {/* Always offer to create a new exercise as long as the typed name
+              doesn't exactly match an existing one. Earlier we hid this
+              whenever the search returned any match (e.g. "kürek" matched
+              "Kürek Çekme"), making it impossible to add a shorter-named
+              new exercise. */}
+          {q.trim() && !exactMatch && (
+            <div className="card mt-2" style={{ background: 'var(--peach-bg)' }}>
+              <div className="small text-muted" style={{ marginBottom: 8 }}>Create a new exercise</div>
+              <div className="field" style={{ marginBottom: 8 }}>
+                <label className="small" style={{ color: 'var(--ink-soft)' }}>Group (optional)</label>
+                <select
+                  value={newExGroup}
+                  onChange={(e) => {
+                    if (e.target.value === '__new__') { createGroupInline(); return; }
+                    setNewExGroup(e.target.value);
+                  }}
+                >
+                  <option value="">— Ungrouped —</option>
+                  {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  <option value="__new__">＋ New group…</option>
+                </select>
+              </div>
+              <button className="btn primary" onClick={createAndAdd}>+ Create "{q.trim()}" and add</button>
+            </div>
           )}
         </div>
         <button className="btn ghost mt-1" onClick={onClose}>Cancel</button>
@@ -831,6 +1059,10 @@ function ReplaceExerciseModal({ sessionId, seId, currentExerciseId, onClose, rel
     .filter((e) => e.id !== currentExerciseId)
     .filter((e) => normalize(e.name).includes(nq));
 
+  // An exact match means user is just looking at the current entry —
+  // don't offer to "+ Create" a duplicate.
+  const exactMatch = roster.some((e) => normalize(e.name) === nq && nq !== '');
+
   async function pick(exerciseId) {
     await api.post(`/sessions/${sessionId}/exercises/${seId}/replace`, { exercise_id: exerciseId });
     reload();
@@ -858,15 +1090,14 @@ function ReplaceExerciseModal({ sessionId, seId, currentExerciseId, onClose, rel
           </div>
         </div>
         <div className="modal-scroll">
-          {filtered.length === 0 && q.trim() ? (
-            <button className="btn primary" onClick={createAndPick}>+ Create "{q}" and replace</button>
-          ) : (
-            filtered.map((e) => (
-              <div className="list-row" key={e.id} onClick={() => pick(e.id)}>
-                <div className="meta"><span>💪</span> {e.name}</div>
-                <span style={{ color: 'var(--gray)' }}>⇄</span>
-              </div>
-            ))
+          {filtered.map((e) => (
+            <div className="list-row" key={e.id} onClick={() => pick(e.id)}>
+              <div className="meta"><span>💪</span> {e.name}</div>
+              <span style={{ color: 'var(--gray)' }}>⇄</span>
+            </div>
+          ))}
+          {q.trim() && !exactMatch && (
+            <button className="btn primary mt-2" onClick={createAndPick}>+ Create "{q.trim()}" and replace</button>
           )}
         </div>
         <button className="btn ghost mt-1" onClick={onClose}>Cancel</button>

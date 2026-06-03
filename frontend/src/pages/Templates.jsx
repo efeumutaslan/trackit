@@ -39,7 +39,7 @@ export default function Templates() {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <button className="btn tiny ghost" onClick={(e) => clone(e, t)} title="Clone template">⎘</button>
+                <button className="btn tiny ghost" onClick={(e) => clone(e, t)} title="Duplicate template">Duplicate</button>
                 <span style={{ color: 'var(--gray)' }}>›</span>
               </div>
             </Link>

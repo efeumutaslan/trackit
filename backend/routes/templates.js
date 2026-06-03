@@ -29,9 +29,10 @@ router.get('/', (req, res) => {
   const withEx = templates.map(t => ({
     ...t,
     exercises: db.prepare(`
-      SELECT te.*, e.name AS exercise_name
+      SELECT te.*, e.name AS exercise_name, ea.name AS alt_exercise_name
       FROM template_exercises te
       JOIN exercises e ON e.id = te.exercise_id
+      LEFT JOIN exercises ea ON ea.id = te.alt_exercise_id
       WHERE te.template_id = ?
       ORDER BY te.order_idx
     `).all(t.id),
@@ -45,9 +46,10 @@ router.get('/:id', (req, res) => {
     .get(req.params.id, req.userId);
   if (!t) return res.status(404).json({ error: 'Not found' });
   t.exercises = db.prepare(`
-    SELECT te.*, e.name AS exercise_name
+    SELECT te.*, e.name AS exercise_name, ea.name AS alt_exercise_name
     FROM template_exercises te
     JOIN exercises e ON e.id = te.exercise_id
+    LEFT JOIN exercises ea ON ea.id = te.alt_exercise_id
     WHERE te.template_id = ?
     ORDER BY te.order_idx
   `).all(t.id);
@@ -61,8 +63,9 @@ router.post('/', (req, res) => {
   const insertTmpl = db.prepare('INSERT INTO templates (user_id, name, color) VALUES (?, ?, ?)');
   const insertEx = db.prepare(
     `INSERT INTO template_exercises
-       (template_id, exercise_id, order_idx, target_sets, target_reps, target_time_s, target_mileage_m)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+       (template_id, exercise_id, order_idx, target_sets, target_reps,
+        target_time_s, target_mileage_m, alt_exercise_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const txn = db.transaction(() => {
     const info = insertTmpl.run(req.userId, name.trim(), finalColor);
@@ -70,7 +73,8 @@ router.post('/', (req, res) => {
       insertEx.run(
         info.lastInsertRowid, ex.exercise_id, idx,
         ex.target_sets || 3, ex.target_reps || '',
-        ex.target_time_s || null, ex.target_mileage_m || null
+        ex.target_time_s || null, ex.target_mileage_m || null,
+        ex.alt_exercise_id || null
       );
     });
     return info.lastInsertRowid;
@@ -91,14 +95,16 @@ router.put('/:id', (req, res) => {
       db.prepare('DELETE FROM template_exercises WHERE template_id = ?').run(id);
       const stmt = db.prepare(
         `INSERT INTO template_exercises
-           (template_id, exercise_id, order_idx, target_sets, target_reps, target_time_s, target_mileage_m)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+           (template_id, exercise_id, order_idx, target_sets, target_reps,
+            target_time_s, target_mileage_m, alt_exercise_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       );
       exercises.forEach((ex, idx) => {
         stmt.run(
           id, ex.exercise_id, idx,
           ex.target_sets || 3, ex.target_reps || '',
-          ex.target_time_s || null, ex.target_mileage_m || null
+          ex.target_time_s || null, ex.target_mileage_m || null,
+          ex.alt_exercise_id || null
         );
       });
     }

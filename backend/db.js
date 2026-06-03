@@ -161,4 +161,25 @@ addCol('session_sets', 'target_mileage_m', 'INTEGER');
 addCol('template_exercises', 'target_time_s',    'INTEGER');
 addCol('template_exercises', 'target_mileage_m', 'INTEGER');
 
+// A/B alternate exercise — each row in session_exercises or template_exercises
+// can carry an optional alt_exercise_id (so the user can swap on the fly).
+// alt_active (0/1) controls which one is currently being logged.
+addCol('session_exercises',  'alt_exercise_id', 'INTEGER REFERENCES exercises(id)');
+addCol('session_exercises',  'alt_active',      'INTEGER NOT NULL DEFAULT 0');
+addCol('template_exercises', 'alt_exercise_id', 'INTEGER REFERENCES exercises(id)');
+
+// Per-session UI mode: 'expandable' (collapsed accordion) | 'fixed' (always open)
+addCol('workout_sessions', 'expand_mode', "TEXT NOT NULL DEFAULT 'expandable'");
+
+// User preferences (single row per user)
+db.exec(`
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id              INTEGER PRIMARY KEY,
+  rep_placeholder_mode TEXT NOT NULL DEFAULT 'empty',     -- 'empty' | 'previous'
+  rest_timer_sound     INTEGER NOT NULL DEFAULT 1,        -- 0/1
+  rest_timer_vibrate   INTEGER NOT NULL DEFAULT 1,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+`);
+
 console.log('DB ready:', DB_PATH);

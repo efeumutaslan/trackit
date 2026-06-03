@@ -64,6 +64,38 @@ function getPrevSetWeights(userId, exerciseId, templateId, beforeDate, excludeSe
   return rows.map((r) => r.weight_kg);
 }
 
+// Same lookup, but returns reps_done. Used for the "Show previous reps"
+// placeholder hint on the rep input.
+function getPrevSetReps(userId, exerciseId, templateId, beforeDate, excludeSessionId) {
+  const exclude = excludeSessionId || -1;
+  let sourceSE = null;
+  if (templateId) {
+    sourceSE = db.prepare(`
+      SELECT se.id FROM session_exercises se
+      JOIN workout_sessions ws ON ws.id = se.session_id
+      WHERE ws.user_id = ? AND se.exercise_id = ?
+        AND ws.template_id = ? AND ws.session_date <= ? AND ws.id != ?
+      ORDER BY ws.session_date DESC, ws.created_at DESC, ws.id DESC LIMIT 1
+    `).get(userId, exerciseId, templateId, beforeDate, exclude);
+  }
+  if (!sourceSE) {
+    sourceSE = db.prepare(`
+      SELECT se.id FROM session_exercises se
+      JOIN workout_sessions ws ON ws.id = se.session_id
+      WHERE ws.user_id = ? AND se.exercise_id = ?
+        AND ws.session_date <= ? AND ws.id != ?
+      ORDER BY ws.session_date DESC, ws.created_at DESC, ws.id DESC LIMIT 1
+    `).get(userId, exerciseId, beforeDate, exclude);
+  }
+  if (!sourceSE) return [];
+  const rows = db.prepare(`
+    SELECT reps_done FROM session_sets
+    WHERE session_exercise_id = ?
+    ORDER BY set_number
+  `).all(sourceSE.id);
+  return rows.map((r) => r.reps_done);
+}
+
 function loadSession(userId, sessionId) {
   const s = db.prepare(`
     SELECT ws.*, t.name AS template_name, t.color AS template_color
@@ -94,9 +126,12 @@ function loadSession(userId, sessionId) {
   }
 
   const exercises = db.prepare(`
-    SELECT se.*, e.name AS exercise_name
+    SELECT se.*,
+           e.name  AS exercise_name,
+           ea.name AS alt_exercise_name
     FROM session_exercises se
     JOIN exercises e ON e.id = se.exercise_id
+    LEFT JOIN exercises ea ON ea.id = se.alt_exercise_id
     WHERE se.session_id = ?
     ORDER BY se.order_idx
   `).all(sessionId);
@@ -182,6 +217,13 @@ function loadSession(userId, sessionId) {
       `).get(userId, ex.exercise_id, s.session_date, s.created_at, s.id);
     }
     ex.prev_weight_adjust = prevAdj?.weight_adjust || '';
+
+    // Per-set previous reps. Used by the UI when the user's setting is
+    // "Show previous reps" — rendered as a faint placeholder on the rep
+    // input so the user can confirm or adjust quickly.
+    ex.prev_set_reps = getPrevSetReps(
+      userId, ex.exercise_id, s.template_id || null, s.session_date, s.id
+    );
   }
   s.exercises = exercises;
   return s;
@@ -232,7 +274,7 @@ router.post('/', (req, res) => {
       // copy exercises from the template
       exToInsert = db.prepare(`
         SELECT exercise_id, order_idx, target_sets, target_reps,
-               target_time_s, target_mileage_m
+               target_time_s, target_mileage_m, alt_exercise_id
         FROM template_exercises WHERE template_id = ?
         ORDER BY order_idx
       `).all(template_id);
@@ -242,8 +284,8 @@ router.post('/', (req, res) => {
     const insSE = db.prepare(`
       INSERT INTO session_exercises
         (session_id, exercise_id, order_idx, target_sets, target_reps,
-         target_time_s, target_mileage_m, prev_exercise_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         target_time_s, target_mileage_m, prev_exercise_notes, alt_exercise_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insSet = db.prepare(`
       INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, reps_done)
@@ -255,11 +297,10 @@ router.post('/', (req, res) => {
         sid, ex.exercise_id, idx,
         ex.target_sets || 3, ex.target_reps || '',
         ex.target_time_s || null, ex.target_mileage_m || null,
-        prevNote
+        prevNote, ex.alt_exercise_id || null
       );
       const seId = seInfo.lastInsertRowid;
       const setsCount = ex.target_sets || 3;
-      // Pre-fill set weights with last session's weights (same template preferred)
       const prevWeights = getPrevSetWeights(req.userId, ex.exercise_id, template_id || null, date, sid);
       for (let i = 1; i <= setsCount; i++) {
         const w = prevWeights[i - 1] != null ? prevWeights[i - 1] : null;
@@ -282,12 +323,18 @@ router.put('/:id', (req, res) => {
 
   const {
     session_date, started_at, finished_at, workout_notes, template_id, mood,
+    expand_mode,
   } = req.body || {};
+
+  // Whitelist expand_mode
+  const mode = expand_mode === 'fixed' ? 'fixed'
+             : expand_mode === 'expandable' ? 'expandable'
+             : cur.expand_mode;
 
   db.prepare(`
     UPDATE workout_sessions
     SET session_date = ?, started_at = ?, finished_at = ?,
-        workout_notes = ?, template_id = ?, mood = ?
+        workout_notes = ?, template_id = ?, mood = ?, expand_mode = ?
     WHERE id = ?
   `).run(
     session_date ?? cur.session_date,
@@ -296,6 +343,7 @@ router.put('/:id', (req, res) => {
     workout_notes ?? cur.workout_notes,
     template_id !== undefined ? template_id : cur.template_id,
     mood ?? cur.mood,
+    mode,
     id
   );
   res.json(loadSession(req.userId, id));
@@ -373,11 +421,13 @@ router.put('/:id/exercises/:seId', (req, res) => {
   const {
     exercise_notes, weight_adjust, target_reps, target_sets,
     superset_tag, rest_seconds, target_time_s, target_mileage_m,
+    alt_exercise_id, alt_active,
   } = req.body || {};
   db.prepare(`
     UPDATE session_exercises
     SET exercise_notes = ?, weight_adjust = ?, target_reps = ?, target_sets = ?,
-        superset_tag = ?, rest_seconds = ?, target_time_s = ?, target_mileage_m = ?
+        superset_tag = ?, rest_seconds = ?, target_time_s = ?, target_mileage_m = ?,
+        alt_exercise_id = ?, alt_active = ?
     WHERE id = ?
   `).run(
     exercise_notes   ?? se.exercise_notes,
@@ -388,6 +438,8 @@ router.put('/:id/exercises/:seId', (req, res) => {
     rest_seconds     !== undefined ? rest_seconds     : se.rest_seconds,
     target_time_s    !== undefined ? target_time_s    : se.target_time_s,
     target_mileage_m !== undefined ? target_mileage_m : se.target_mileage_m,
+    alt_exercise_id  !== undefined ? alt_exercise_id  : se.alt_exercise_id,
+    alt_active       !== undefined ? (alt_active ? 1 : 0) : se.alt_active,
     seId
   );
   res.json({ ok: true });
@@ -525,7 +577,7 @@ router.post('/:id/save-as-template', (req, res) => {
   if (!cur) return res.status(404).json({ error: 'Session not found' });
   const ses = db.prepare(`
     SELECT exercise_id, order_idx, target_sets, target_reps,
-           target_time_s, target_mileage_m
+           target_time_s, target_mileage_m, alt_exercise_id
     FROM session_exercises WHERE session_id = ? ORDER BY order_idx
   `).all(id);
   const txn = db.transaction(() => {
@@ -533,12 +585,14 @@ router.post('/:id/save-as-template', (req, res) => {
       .run(req.userId, name.trim(), color || '#FFB07A');
     const ins = db.prepare(`
       INSERT INTO template_exercises
-        (template_id, exercise_id, order_idx, target_sets, target_reps, target_time_s, target_mileage_m)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+        (template_id, exercise_id, order_idx, target_sets, target_reps,
+         target_time_s, target_mileage_m, alt_exercise_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     ses.forEach(s => ins.run(
       t.lastInsertRowid, s.exercise_id, s.order_idx,
-      s.target_sets, s.target_reps, s.target_time_s, s.target_mileage_m
+      s.target_sets, s.target_reps, s.target_time_s, s.target_mileage_m,
+      s.alt_exercise_id || null
     ));
     db.prepare('UPDATE workout_sessions SET template_id = ? WHERE id = ?').run(t.lastInsertRowid, id);
     return t.lastInsertRowid;
@@ -556,19 +610,21 @@ router.post('/:id/update-template', (req, res) => {
   if (!cur.template_id) return res.status(400).json({ error: 'This session was not started from a template' });
   const ses = db.prepare(`
     SELECT exercise_id, order_idx, target_sets, target_reps,
-           target_time_s, target_mileage_m
+           target_time_s, target_mileage_m, alt_exercise_id
     FROM session_exercises WHERE session_id = ? ORDER BY order_idx
   `).all(id);
   const txn = db.transaction(() => {
     db.prepare('DELETE FROM template_exercises WHERE template_id = ?').run(cur.template_id);
     const ins = db.prepare(`
       INSERT INTO template_exercises
-        (template_id, exercise_id, order_idx, target_sets, target_reps, target_time_s, target_mileage_m)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+        (template_id, exercise_id, order_idx, target_sets, target_reps,
+         target_time_s, target_mileage_m, alt_exercise_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     ses.forEach(s => ins.run(
       cur.template_id, s.exercise_id, s.order_idx,
-      s.target_sets, s.target_reps, s.target_time_s, s.target_mileage_m
+      s.target_sets, s.target_reps, s.target_time_s, s.target_mileage_m,
+      s.alt_exercise_id || null
     ));
   });
   txn();

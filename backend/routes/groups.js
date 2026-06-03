@@ -39,12 +39,27 @@ router.put('/:id', (req, res) => {
   res.json(db.prepare('SELECT * FROM exercise_groups WHERE id = ?').get(req.params.id));
 });
 
+// Preview which exercises live in this group — used by the UI to confirm
+// "really delete? these N exercises will become ungrouped".
+router.get('/:id/exercises', (req, res) => {
+  const grp = db
+    .prepare('SELECT * FROM exercise_groups WHERE id = ? AND user_id = ?')
+    .get(req.params.id, req.userId);
+  if (!grp) return res.status(404).json({ error: 'Not found' });
+  const rows = db
+    .prepare('SELECT id, name FROM exercises WHERE user_id = ? AND group_id = ? AND archived = 0 ORDER BY name')
+    .all(req.userId, req.params.id);
+  res.json(rows);
+});
+
 router.delete('/:id', (req, res) => {
   const grp = db
     .prepare('SELECT * FROM exercise_groups WHERE id = ? AND user_id = ?')
     .get(req.params.id, req.userId);
   if (!grp) return res.status(404).json({ error: 'Not found' });
-  // exercises.group_id is set NULL on cascade — they become "Ungrouped" again
+  // Move every exercise in this group back to "Ungrouped" before archiving the group.
+  db.prepare('UPDATE exercises SET group_id = NULL WHERE user_id = ? AND group_id = ?')
+    .run(req.userId, req.params.id);
   db.prepare('UPDATE exercise_groups SET archived = 1 WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });

@@ -56,6 +56,20 @@ export default function Heatmap() {
     cols.push(days.slice(c * 7, c * 7 + 7));
   }
 
+  // For each column, decide if a month label should appear above it.
+  // A label appears at the FIRST column whose first day's month differs
+  // from the previous column's month. That way each month appears once,
+  // anchored at its starting week.
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLabels = cols.map((col, ci) => {
+    if (!col || col.length === 0) return '';
+    const m = col[0].date.getMonth();
+    const prev = ci > 0 && cols[ci - 1].length > 0
+      ? cols[ci - 1][0].date.getMonth()
+      : -1;
+    return m !== prev ? MONTHS[m] : '';
+  });
+
   function dayStyle(list) {
     if (!list || list.length === 0) return null;
     const color = list[0]?.template_color || 'var(--peach)';
@@ -70,6 +84,11 @@ export default function Heatmap() {
 
   return (
     <div className="heatmap">
+      <div className="heatmap-months">
+        {monthLabels.map((m, ci) => (
+          <div key={ci} className="heatmap-month">{m}</div>
+        ))}
+      </div>
       <div className="heatmap-grid">
         {cols.map((col, ci) => (
           <div className="heatmap-col" key={ci}>

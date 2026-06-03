@@ -53,8 +53,21 @@ export default function ExerciseEdit() {
     nav('/exercises');
   }
 
+  // Inline group creation right from the dropdown — saves a round trip
+  // to Settings just to add a new group.
+  async function createGroupInline() {
+    const name = prompt('New group name:');
+    if (!name || !name.trim()) return;
+    try {
+      const g = await api.post('/groups', { name: name.trim() });
+      const list = await api.get('/groups');
+      setGroups(list);
+      setGroupId(String(g.id));
+    } catch (e) { alert(e.message || String(e)); }
+  }
+
   return (
-    <div className="app-shell">
+    <div className="app-shell page-exercise-edit">
       <TopBar
         back
         title={isNew ? 'New exercise' : 'Edit exercise'}
@@ -68,11 +81,17 @@ export default function ExerciseEdit() {
           </div>
           <div className="field">
             <label>Group</label>
-            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+            <select
+              value={groupId}
+              onChange={(e) => {
+                if (e.target.value === '__new__') { createGroupInline(); return; }
+                setGroupId(e.target.value);
+              }}
+            >
               <option value="">— Ungrouped —</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              <option value="__new__">＋ New group…</option>
             </select>
-            <div className="small text-muted mt-1">Create groups in Settings.</div>
           </div>
           <div className="field" style={{ marginBottom: 0 }}>
             <label>General notes (optional)</label>

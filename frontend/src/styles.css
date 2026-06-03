@@ -746,10 +746,10 @@ a { color: inherit; text-decoration: none; }
   font-weight: 600; text-align: center; color: var(--ink-soft);
 }
 
-/* KG cell: a single rounded input with − and + buttons placed *inside*
-   its left and right edges. The buttons sit on top of the input via
-   absolute positioning so the value field stays a single visual unit
-   and the number remains centered. */
+/* KG cell: a SINGLE rounded input. The − and + buttons sit on top of it
+   as transparent zones at the left and right edges, so the whole thing
+   looks like one pill ([+   15   −]). Buttons have no own background so
+   the input's border draws the full perimeter. */
 .set-kg-wrap {
   position: relative;
   display: flex;
@@ -760,31 +760,33 @@ a { color: inherit; text-decoration: none; }
   min-width: 0;
   width: 100%;
   text-align: center;
-  /* Reserve space on both sides so the number doesn't slide under the buttons */
-  padding-left: 36px;
-  padding-right: 36px;
+  padding-left: 30px;
+  padding-right: 30px;
 }
 .kg-bump {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
-  width: 32px;
-  background: var(--peach-soft);
-  color: var(--ink);
+  top: 0;
+  bottom: 0;
+  width: 30px;
+  background: transparent;
+  color: var(--peach-dark);
   border: none;
-  border-radius: 6px;
-  font-weight: 700;
-  font-size: 18px;
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1;
   cursor: pointer;
-  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1;
+  -webkit-tap-highlight-color: transparent;
 }
-.kg-bump:first-of-type { left: 2px; }
-.kg-bump:last-of-type  { right: 2px; }
-.kg-bump:active { background: var(--peach); color: var(--white); transform: scale(0.93); }
+.kg-bump:first-of-type { left: 0; }
+.kg-bump:last-of-type  { right: 0; }
+.kg-bump:active {
+  background: rgba(255, 176, 122, 0.18);
+  transform: scale(0.94);
+}
 
 /* Highlight inputs whose value has a target on the SE */
 .set-row input.has-target {
@@ -934,3 +936,155 @@ a { color: inherit; text-decoration: none; }
 .heatmap-cell.has-session { cursor: pointer; }
 .heatmap-cell.future { opacity: 0.35; }
 .heatmap-cell.has-session:active { transform: scale(0.85); }
+
+/* ─── Segmented buttons (Settings, Date display mode, A/B) ────────── */
+.seg-group {
+  display: flex;
+  gap: 0;
+  background: var(--gray-bg);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  border: 1px solid var(--gray-soft);
+}
+.seg-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+}
+.seg-btn.on {
+  background: var(--peach-soft);
+  color: var(--peach-dark);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.seg-btn:active { transform: scale(0.97); }
+
+/* ─── Accordion (collapsed exercise card hides everything below the head) ─── */
+.exercise-block.is-collapsed > .exercise-body { display: none; }
+.exercise-head__summary {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+/* ─── Superset card clustering — connected pills ────────────────────
+   Three pieces (top / mid / bot) collapse the gap between cards and
+   round only the outer corners, so a run of supersetted exercises
+   looks like one continuous coloured frame. */
+.exercise-block.superset-top {
+  margin-bottom: 0 !important;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: 1px dashed var(--gray-soft);
+}
+.exercise-block.superset-mid {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  border-radius: 0;
+  border-top: none;
+  border-bottom: 1px dashed var(--gray-soft);
+}
+.exercise-block.superset-bot {
+  margin-top: 0 !important;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: none;
+}
+/* When in a superset cluster, the prev-up/down tint stripe runs along
+   only the appropriate edge — full stripe on top + bottom, no stripe on
+   mid (so the cluster reads as one shape). */
+.exercise-block.superset-mid.exercise-block--prev-up,
+.exercise-block.superset-mid.exercise-block--prev-down,
+.exercise-block.superset-top.exercise-block--prev-up,
+.exercise-block.superset-top.exercise-block--prev-down,
+.exercise-block.superset-bot.exercise-block--prev-up,
+.exercise-block.superset-bot.exercise-block--prev-down {
+  /* Tint background stays; left stripe is preserved by the base rule */
+}
+
+/* ─── A/B toggle next to the exercise name ──────────────────────── */
+.alt-toggle {
+  display: inline-flex;
+  background: var(--gray-bg);
+  border-radius: 6px;
+  padding: 2px;
+  margin-left: 6px;
+}
+.alt-toggle__btn {
+  background: transparent;
+  border: none;
+  width: 26px;
+  height: 22px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.alt-toggle__btn.on {
+  background: var(--peach);
+  color: var(--white);
+}
+
+/* ─── Alt-exercise inline picker inside the ⚙ targets panel ───── */
+.alt-picker { margin-top: 8px; }
+.alt-picker .alt-current {
+  flex: 1;
+  background: var(--white);
+  border: 1px solid var(--gray-soft);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-weight: 500;
+}
+.alt-picker__list {
+  background: var(--white);
+  border: 1px solid var(--gray-soft);
+  border-radius: var(--radius-sm);
+  margin-top: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.alt-picker__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--gray-bg);
+}
+.alt-picker__row:last-child { border-bottom: none; }
+.alt-picker__row:hover { background: var(--peach-bg); }
+
+/* ─── Rep input — placeholder hint colour for "Show previous reps" ── */
+.set-row input.has-prev-hint::placeholder {
+  color: var(--gray);
+  opacity: 0.5;
+  font-weight: 600;
+}
+
+/* ─── Heatmap month-labels row above the grid ─────────────────── */
+.heatmap-months {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 4px;
+  padding-left: 0;
+  font-size: 10px;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.heatmap-month {
+  width: 10px;
+  flex-shrink: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+@media (min-width: 1024px) {
+  .heatmap-month { width: 14px; }
+}

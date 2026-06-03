@@ -52,6 +52,7 @@ export default function TemplateEdit() {
           target_reps: e.target_reps,
           target_time_s:    e.target_time_s    ?? null,
           target_mileage_m: e.target_mileage_m ?? null,
+          alt_exercise_id:  e.alt_exercise_id  ?? null,
         })));
       });
     }
@@ -68,6 +69,7 @@ export default function TemplateEdit() {
         target_reps: e.target_reps,
         target_time_s: e.target_time_s ?? null,
         target_mileage_m: e.target_mileage_m ?? null,
+        alt_exercise_id: e.alt_exercise_id ?? null,
       })),
     };
     if (isNew) {
@@ -213,6 +215,27 @@ export default function TemplateEdit() {
                     placeholder="2400"
                   />
                 </div>
+              </div>
+              {/* A/B alternate — pre-pair an exercise here so the session
+                  can toggle to it without having to use Replace. */}
+              <div className="field mt-1" style={{ marginBottom: 0 }}>
+                <label className="small text-muted">Alternate exercise (B) — optional</label>
+                <select
+                  value={ex.alt_exercise_id ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const next = [...exercises];
+                    next[idx] = { ...ex, alt_exercise_id: v === '' ? null : +v };
+                    setExercises(next);
+                  }}
+                >
+                  <option value="">— None —</option>
+                  {roster
+                    .filter((r) => r.id !== ex.exercise_id)
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                </select>
               </div>
             </div>
           ))

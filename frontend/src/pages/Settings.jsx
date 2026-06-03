@@ -3,33 +3,19 @@ import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 
 export default function Settings() {
-  const [groups, setGroups] = useState([]);
-  const [newGroup, setNewGroup] = useState('');
+  const [settings, setSettings] = useState(null);
   const [importStatus, setImportStatus] = useState('');
 
   useEffect(() => {
-    api.get('/groups').then(setGroups).catch(() => {});
+    api.get('/settings').then(setSettings).catch(() => {});
   }, []);
 
-  async function addGroup() {
-    if (!newGroup.trim()) return;
-    try {
-      await api.post('/groups', { name: newGroup.trim() });
-      setNewGroup('');
-      const list = await api.get('/groups');
-      setGroups(list);
-    } catch (e) { alert(e.message); }
-  }
-
-  async function delGroup(id) {
-    if (!confirm('Delete this group? Exercises will become ungrouped.')) return;
-    await api.del(`/groups/${id}`);
-    const list = await api.get('/groups');
-    setGroups(list);
+  async function update(patch) {
+    const next = await api.put('/settings', { ...settings, ...patch });
+    setSettings(next);
   }
 
   async function exportCsv() {
-    // Hit the protected endpoint with the auth token and trigger a download.
     const token = localStorage.getItem('trackit_token');
     const r = await fetch('/api/csv/export', {
       headers: { Authorization: `Bearer ${token}` },
@@ -49,9 +35,9 @@ export default function Settings() {
   async function importCsv(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImportStatus('Reading file…');
+    setImportStatus('Reading file\u2026');
     const text = await file.text();
-    setImportStatus('Importing…');
+    setImportStatus('Importing\u2026');
     try {
       const res = await api.post('/csv/import', { csv: text });
       setImportStatus(`Imported ${res.imported} rows`);
@@ -62,44 +48,76 @@ export default function Settings() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell page-settings">
       <TopBar back title="Settings" />
       <div className="content">
+        {/* ── Rep input placeholder ────────────────────────────────────── */}
+        <div className="section-title">Rep input placeholder</div>
+        <div className="card">
+          <div className="small text-muted mb-1">
+            What should appear inside a set's rep input before you fill it in.
+          </div>
+          <div className="seg-group">
+            <button
+              className={`seg-btn${settings?.rep_placeholder_mode === 'empty' ? ' on' : ''}`}
+              onClick={() => update({ rep_placeholder_mode: 'empty' })}
+            >Keep empty</button>
+            <button
+              className={`seg-btn${settings?.rep_placeholder_mode === 'previous' ? ' on' : ''}`}
+              onClick={() => update({ rep_placeholder_mode: 'previous' })}
+            >Show previous reps</button>
+          </div>
+        </div>
+
+        {/* ── Rest timer ───────────────────────────────────────────────── */}
+        <div className="section-title">Rest timer</div>
+        <div className="card">
+          <div className="field" style={{ marginBottom: 14 }}>
+            <label>Sound</label>
+            <div className="seg-group">
+              <button
+                className={`seg-btn${settings?.rest_timer_sound ? ' on' : ''}`}
+                onClick={() => update({ rest_timer_sound: true })}
+              >On</button>
+              <button
+                className={`seg-btn${!settings?.rest_timer_sound ? ' on' : ''}`}
+                onClick={() => update({ rest_timer_sound: false })}
+              >Off</button>
+            </div>
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Vibration</label>
+            <div className="seg-group">
+              <button
+                className={`seg-btn${settings?.rest_timer_vibrate ? ' on' : ''}`}
+                onClick={() => update({ rest_timer_vibrate: true })}
+              >On</button>
+              <button
+                className={`seg-btn${!settings?.rest_timer_vibrate ? ' on' : ''}`}
+                onClick={() => update({ rest_timer_vibrate: false })}
+              >Off</button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Data ─────────────────────────────────────────────────────── */}
         <div className="section-title">Data</div>
         <div className="card">
-          <button className="btn primary" onClick={exportCsv}>📤 Export all data (CSV)</button>
+          <button className="btn primary" onClick={exportCsv}>\ud83d\udce4 Export all data (CSV)</button>
           <div className="mt-2">
             <label className="btn ghost" style={{ display: 'block', textAlign: 'center', cursor: 'pointer' }}>
-              📥 Import from CSV
+              \ud83d\udce5 Import from CSV
               <input type="file" accept=".csv,text/csv" onChange={importCsv} style={{ display: 'none' }} />
             </label>
             {importStatus && <div className="small text-muted mt-1">{importStatus}</div>}
           </div>
           <div className="small text-muted mt-2">
-            Export gives one row per set. Import is additive — it never overwrites your existing data.
+            Export gives one row per set. Import is additive \u2014 it never overwrites existing data.
           </div>
         </div>
 
-        <div className="section-title">Exercise groups</div>
-        <div className="card">
-          <div className="row mb-1">
-            <input
-              value={newGroup}
-              onChange={(e) => setNewGroup(e.target.value)}
-              placeholder="e.g. Push, Pull, Legs, Cardio"
-            />
-            <button className="btn primary" style={{ width: 100, flexShrink: 0 }} onClick={addGroup}>+ Add</button>
-          </div>
-          {groups.length === 0 ? (
-            <div className="empty"><div>No groups yet</div></div>
-          ) : (
-            groups.map((g) => (
-              <div key={g.id} className="list-row">
-                <div className="meta">{g.name}</div>
-                <button className="btn tiny ghost" onClick={() => delGroup(g.id)}>✕</button>
-              </div>
-            ))
-          )}
+        <div className="small text-muted mt-2" style={{ textAlign: 'center' }}>
+          Manage exercise groups under the <strong>Exercises</strong> tab.
         </div>
       </div>
     </div>
