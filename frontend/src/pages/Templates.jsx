@@ -19,7 +19,7 @@ export default function Templates() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell page-templates">
       <TopBar back title="Templates" />
       <div className="content">
         <Link to="/templates/new" className="btn primary mb-2">+ New template</Link>
@@ -29,21 +29,30 @@ export default function Templates() {
             <div>No templates yet</div>
           </div>
         ) : (
-          rows.map((t) => (
-            <Link to={`/templates/${t.id}`} key={t.id} className="list-row">
-              <div className="meta">
-                <span className="color-dot" style={{ background: t.color }} />
-                <div>
-                  <div style={{ fontWeight: 600 }}>{t.name}</div>
-                  <div className="small text-muted">{t.exercises?.length || 0} exercises</div>
+          <div className="template-grid">
+            {rows.map((t) => (
+              <Link to={`/templates/${t.id}`} key={t.id} className="template-card">
+                <div className="template-card__strip" style={{ background: t.color }} />
+                <div className="template-card__body">
+                  <div className="template-card__name">{t.name}</div>
+                  <div className="template-card__count small text-muted">
+                    {t.exercises?.length || 0} exercises
+                  </div>
+                  {t.exercises && t.exercises.length > 0 && (
+                    <ul className="template-card__list">
+                      {t.exercises.slice(0, 5).map((ex) => (
+                        <li key={ex.id}>{ex.exercise_name || ex.name}</li>
+                      ))}
+                      {t.exercises.length > 5 && (
+                        <li className="text-muted">…and {t.exercises.length - 5} more</li>
+                      )}
+                    </ul>
+                  )}
                 </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <button className="btn tiny ghost" onClick={(e) => clone(e, t)} title="Duplicate template">Duplicate</button>
-                <span style={{ color: 'var(--gray)' }}>›</span>
-              </div>
-            </Link>
-          ))
+                <button className="template-card__clone btn tiny ghost" onClick={(e) => clone(e, t)} title="Duplicate template">Duplicate</button>
+              </Link>
+            ))}
+          </div>
         )}
       </div>
     </div>

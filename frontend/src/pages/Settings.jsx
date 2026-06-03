@@ -35,9 +35,9 @@ export default function Settings() {
   async function importCsv(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImportStatus('Reading file\u2026');
+    setImportStatus('Reading file…');
     const text = await file.text();
-    setImportStatus('Importing\u2026');
+    setImportStatus('Importing…');
     try {
       const res = await api.post('/csv/import', { csv: text });
       setImportStatus(`Imported ${res.imported} rows`);
@@ -103,16 +103,16 @@ export default function Settings() {
         {/* ── Data ─────────────────────────────────────────────────────── */}
         <div className="section-title">Data</div>
         <div className="card">
-          <button className="btn primary" onClick={exportCsv}>\ud83d\udce4 Export all data (CSV)</button>
+          <button className="btn primary" onClick={exportCsv}>📤 Export all data (CSV)</button>
           <div className="mt-2">
             <label className="btn ghost" style={{ display: 'block', textAlign: 'center', cursor: 'pointer' }}>
-              \ud83d\udce5 Import from CSV
+              📥 Import from CSV
               <input type="file" accept=".csv,text/csv" onChange={importCsv} style={{ display: 'none' }} />
             </label>
             {importStatus && <div className="small text-muted mt-1">{importStatus}</div>}
           </div>
           <div className="small text-muted mt-2">
-            Export gives one row per set. Import is additive \u2014 it never overwrites existing data.
+            Export gives one row per set. Import is additive — it never overwrites existing data.
           </div>
         </div>
 

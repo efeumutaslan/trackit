@@ -28,7 +28,7 @@ export default function Exercises() {
   // user knows what will be left ungrouped.
   async function delGroup(g) {
     const inGroup = await api.get(`/groups/${g.id}/exercises`).catch(() => []);
-    const lines = (inGroup || []).map((e) => `\u2022 ${e.name}`).join('\n');
+    const lines = (inGroup || []).map((e) => `• ${e.name}`).join('\n');
     const msg = inGroup.length === 0
       ? `Delete the group "${g.name}"?`
       : `Do you really want to delete this group? This action can't be undone. Following exercises happen to be in this group:\n\n${lines}\n\nThey will become ungrouped.`;

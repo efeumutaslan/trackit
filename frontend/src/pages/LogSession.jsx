@@ -48,7 +48,7 @@ export default function LogSession() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell page-log-session">
       <TopBar back title="Log a workout" />
       <div className="content">
         <div className="field">

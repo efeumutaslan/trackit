@@ -48,7 +48,7 @@ export default function Bodyweight() {
   const range = Math.max(max - min, 1);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell page-bodyweight">
       <TopBar back title="Bodyweight" />
       <div className="content">
         <div className="card">

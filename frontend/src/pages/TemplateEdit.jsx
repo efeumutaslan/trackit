@@ -121,7 +121,7 @@ export default function TemplateEdit() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell page-template-edit">
       <TopBar
         back
         title={isNew ? 'New template' : 'Edit template'}

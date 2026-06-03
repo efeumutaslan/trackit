@@ -18,21 +18,31 @@ export default function Home() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
   const [recent, setRecent] = useState([]);
+  const [stats, setStats] = useState({ thisWeek: 0, totalSessions: 0, latestBw: null });
   const [view, setView] = useState('month'); // 'month' | 'year'
 
   useEffect(() => {
-    api.get('/sessions').then((rows) => setRecent(rows.slice(0, 5))).catch(() => {});
+    api.get('/sessions').then((rows) => {
+      setRecent(rows.slice(0, 5));
+      const now = new Date();
+      const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+      const inWeek = rows.filter((r) => new Date(r.session_date) >= weekAgo);
+      setStats((s) => ({ ...s, thisWeek: inWeek.length, totalSessions: rows.length }));
+    }).catch(() => {});
+    api.get('/bodyweight/latest').then((bw) => {
+      setStats((s) => ({ ...s, latestBw: bw }));
+    }).catch(() => {});
   }, []);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell page-home">
       <TopBar
         brand
         right={
           <div style={{ display: 'flex', gap: 4 }}>
-            <Link className="right-action" to="/settings" title="Settings">⚙</Link>
+            <Link className="right-action mobile-only" to="/settings" title="Settings">⚙</Link>
             <button
-              className="right-action"
+              className="right-action mobile-only"
               onClick={() => { logout(); nav('/login'); }}
               title="Sign out"
             >
@@ -42,48 +52,88 @@ export default function Home() {
         }
       />
       <div className="content">
-        <div className="welcome-bar">
+        {/* Mobile welcome bar */}
+        <div className="welcome-bar mobile-only">
           <div className="welcome-bar__name">
             <span className="welcome-bar__user">{user?.username}</span>
           </div>
           <Link to="/log" className="btn primary welcome-bar__cta">+ Log a workout</Link>
         </div>
 
-        <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>{view === 'month' ? 'Calendar' : 'Year heatmap'}</span>
-          <div className="view-toggle">
-            <button className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>Month</button>
-            <button className={view === 'year' ? 'on' : ''} onClick={() => setView('year')}>Year</button>
+        {/* Desktop hero: greeting + stat cards + CTA */}
+        <div className="desktop-hero desktop-only">
+          <div className="desktop-hero__head">
+            <div>
+              <div className="desktop-hero__hi">Welcome back,</div>
+              <div className="desktop-hero__user">{user?.username}</div>
+            </div>
+            <Link to="/log" className="btn primary desktop-hero__cta">+ Log a workout</Link>
+          </div>
+          <div className="stat-grid">
+            <div className="stat-card">
+              <div className="stat-card__label">This week</div>
+              <div className="stat-card__value">{stats.thisWeek}</div>
+              <div className="stat-card__hint">workouts</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card__label">Total</div>
+              <div className="stat-card__value">{stats.totalSessions}</div>
+              <div className="stat-card__hint">sessions</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card__label">Bodyweight</div>
+              <div className="stat-card__value">
+                {stats.latestBw ? `${stats.latestBw.weight_kg} kg` : '—'}
+              </div>
+              <div className="stat-card__hint">
+                {stats.latestBw ? fmtDate(stats.latestBw.log_date) : 'Log to start'}
+              </div>
+            </div>
           </div>
         </div>
-        {view === 'month' ? <Calendar /> : <Heatmap />}
 
-        <div className="section-title">Recent sessions</div>
-        {recent.length === 0 ? (
-          <div className="empty">
-            <div className="icon">📋</div>
-            <div>No sessions yet. Start your first workout!</div>
-          </div>
-        ) : (
-          recent.map((s) => (
-            <Link to={`/sessions/${s.id}`} key={s.id} className="list-row">
-              <div className="meta">
-                <span
-                  className="color-dot"
-                  style={{ background: s.template_color || 'var(--gray-soft)' }}
-                />
-                <div>
-                  <div style={{ fontWeight: 600 }}>{s.template_name || 'Untitled session'}</div>
-                  <div className="small text-muted">{fmtDate(s.session_date)}</div>
-                </div>
+        {/* 2-column dashboard on desktop, stacked on mobile */}
+        <div className="home-grid">
+          <section className="home-grid__main">
+            <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{view === 'month' ? 'Calendar' : 'Year heatmap'}</span>
+              <div className="view-toggle">
+                <button className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>Month</button>
+                <button className={view === 'year' ? 'on' : ''} onClick={() => setView('year')}>Year</button>
               </div>
-              <span style={{ color: 'var(--gray)' }}>›</span>
-            </Link>
-          ))
-        )}
-        {recent.length > 0 && (
-          <Link to="/sessions" className="btn ghost mt-2">View all</Link>
-        )}
+            </div>
+            {view === 'month' ? <Calendar /> : <Heatmap />}
+          </section>
+
+          <aside className="home-grid__side">
+            <div className="section-title">Recent sessions</div>
+            {recent.length === 0 ? (
+              <div className="empty">
+                <div className="icon">📋</div>
+                <div>No sessions yet. Start your first workout!</div>
+              </div>
+            ) : (
+              recent.map((s) => (
+                <Link to={`/sessions/${s.id}`} key={s.id} className="list-row">
+                  <div className="meta">
+                    <span
+                      className="color-dot"
+                      style={{ background: s.template_color || 'var(--gray-soft)' }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{s.template_name || 'Untitled session'}</div>
+                      <div className="small text-muted">{fmtDate(s.session_date)}</div>
+                    </div>
+                  </div>
+                  <span style={{ color: 'var(--gray)' }}>›</span>
+                </Link>
+              ))
+            )}
+            {recent.length > 0 && (
+              <Link to="/sessions" className="btn ghost mt-2">View all</Link>
+            )}
+          </aside>
+        </div>
       </div>
     </div>
   );

@@ -112,7 +112,7 @@ export default function Session() {
   }
   function cancelRest() { setRestEnd(null); }
 
-  if (!s) return <div className="app-shell"><TopBar back brand /></div>;
+  if (!s) return <div className="app-shell page-session"><TopBar back brand /></div>;
 
   async function saveMeta(patch) {
     setS((cur) => ({ ...cur, ...patch }));
@@ -137,7 +137,7 @@ export default function Session() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell page-session">
       <TopBar
         back
         title={s.template_name || 'Session'}
@@ -145,10 +145,11 @@ export default function Session() {
           <button className="right-action" onClick={delSession} style={{ color: 'var(--red)' }}>Delete</button>
         }
       />
-      <div className="content">
+      <div className="content session-layout">
         <div
           className={`card session-meta${s.finished_at ? ' is-finished' : ''}`}
           style={{ borderLeft: `4px solid ${s.template_color || '#FFB07A'}` }}
+          data-region="meta"
         >
           <div className="field">
             <label>Date</label>
@@ -221,10 +222,20 @@ export default function Session() {
               ))}
             </div>
           )}
+
+          <div className="field" style={{ marginTop: 12, marginBottom: 0 }}>
+            <label>Workout notes</label>
+            <textarea
+              value={s.workout_notes || ''}
+              onChange={(e) => setS((cur) => ({ ...cur, workout_notes: e.target.value }))}
+              onBlur={() => saveMeta({ workout_notes: s.workout_notes })}
+              placeholder="Notes about this workout…"
+            />
+          </div>
         </div>
 
         {s.prev_workout_notes && (
-          <div className="prev-note-card">
+          <div className="prev-note-card" data-region="prev-note">
             <div className="prev-note-head">
               <span className="prev-note-icon">📜</span>
               {s.prev_workout_mood && (
@@ -239,63 +250,57 @@ export default function Session() {
           </div>
         )}
 
-        <div className="field">
-          <label>Workout notes</label>
-          <textarea
-            value={s.workout_notes || ''}
-            onChange={(e) => setS((cur) => ({ ...cur, workout_notes: e.target.value }))}
-            onBlur={() => saveMeta({ workout_notes: s.workout_notes })}
-            placeholder="Notes about this workout…"
-          />
+        <div data-region="exercises">
+          <div className="section-title">Exercises</div>
+          {s.exercises.map((ex, idx) => {
+            // A run of consecutive exercises sharing the same superset_tag
+            // forms a visual cluster — the first card has rounded top, the
+            // last has rounded bottom, the middle ones are flush. Empty
+            // tags ('' or null) never cluster, even with each other.
+            const tag = ex.superset_tag || '';
+            const prevTag = idx > 0 ? (s.exercises[idx - 1].superset_tag || '') : '';
+            const nextTag = idx < s.exercises.length - 1
+              ? (s.exercises[idx + 1].superset_tag || '')
+              : '';
+            let supersetPos = 'none';
+            if (tag) {
+              const inRun = (t1, t2) => t1 && t2 && t1 === t2;
+              const startsRun = inRun(tag, nextTag) && !inRun(tag, prevTag);
+              const endsRun   = inRun(tag, prevTag) && !inRun(tag, nextTag);
+              const midRun    = inRun(tag, prevTag) && inRun(tag, nextTag);
+              if (startsRun)      supersetPos = 'top';
+              else if (midRun)    supersetPos = 'mid';
+              else if (endsRun)   supersetPos = 'bot';
+            }
+            return (
+              <ExerciseBlock
+                key={ex.id}
+                sessionId={s.id}
+                ex={ex}
+                reload={load}
+                sessionDate={s.session_date}
+                onAfterRestSet={startRest}
+                expandMode={s.expand_mode || 'expandable'}
+                settings={settings}
+                supersetPos={supersetPos}
+              />
+            );
+          })}
+
+          <button className="btn mt-1" onClick={() => setShowAddEx(true)}>+ Add exercise</button>
         </div>
 
-        <div className="section-title">Exercises</div>
-        {s.exercises.map((ex, idx) => {
-          // A run of consecutive exercises sharing the same superset_tag
-          // forms a visual cluster — the first card has rounded top, the
-          // last has rounded bottom, the middle ones are flush. Empty
-          // tags ('' or null) never cluster, even with each other.
-          const tag = ex.superset_tag || '';
-          const prevTag = idx > 0 ? (s.exercises[idx - 1].superset_tag || '') : '';
-          const nextTag = idx < s.exercises.length - 1
-            ? (s.exercises[idx + 1].superset_tag || '')
-            : '';
-          let supersetPos = 'none';
-          if (tag) {
-            const inRun = (t1, t2) => t1 && t2 && t1 === t2;
-            const startsRun = inRun(tag, nextTag) && !inRun(tag, prevTag);
-            const endsRun   = inRun(tag, prevTag) && !inRun(tag, nextTag);
-            const midRun    = inRun(tag, prevTag) && inRun(tag, nextTag);
-            if (startsRun)      supersetPos = 'top';
-            else if (midRun)    supersetPos = 'mid';
-            else if (endsRun)   supersetPos = 'bot';
-          }
-          return (
-            <ExerciseBlock
-              key={ex.id}
-              sessionId={s.id}
-              ex={ex}
-              reload={load}
-              sessionDate={s.session_date}
-              onAfterRestSet={startRest}
-              expandMode={s.expand_mode || 'expandable'}
-              settings={settings}
-              supersetPos={supersetPos}
-            />
-          );
-        })}
-
-        <button className="btn mt-1" onClick={() => setShowAddEx(true)}>+ Add exercise</button>
-
-        <div className="section-title">Template</div>
-        {s.template_id ? (
-          <button className="btn ghost" onClick={async () => {
-            if (!confirm('Apply changes from this session to the template? (Past workouts are unaffected)')) return;
-            await api.post(`/sessions/${id}/update-template`);
-            alert('Template updated');
-          }}>♻ Update this template</button>
+        <div data-region="template-actions">
+          <div className="section-title">Template</div>
+          {s.template_id ? (
+            <button className="btn ghost" onClick={async () => {
+              if (!confirm('Apply changes from this session to the template? (Past workouts are unaffected)')) return;
+              await api.post(`/sessions/${id}/update-template`);
+              alert('Template updated');
+            }}>♻ Update this template</button>
         ) : null}
         <button className="btn ghost mt-1" onClick={() => setShowSaveTmpl(true)}>💾 Save as template</button>
+        </div>
 
         {showAddEx && <AddExerciseModal sessionId={s.id} onClose={() => setShowAddEx(false)} reload={load} />}
         {showSaveTmpl && (
