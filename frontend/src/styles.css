@@ -703,14 +703,24 @@ a { color: inherit; text-decoration: none; }
 }
 .adjust-btn:active { transform: scale(0.96); }
 
-/* ---------- Exercise card tinted from previous adjust ---------- */
+/* ---------- Exercise card tinted from previous adjust ----------
+   The prior session's ▲/▼ choice is shown as a clearly visible green
+   or red tint on the next session's exercise card so the user
+   immediately remembers their plan. The earlier 10%-opacity version
+   was invisible against the cream background, so we use a stronger
+   tint plus a 4px coloured left stripe. */
 .exercise-block.exercise-block--prev-up {
-  background: linear-gradient(0deg, rgba(127,205,154,0.10), rgba(127,205,154,0.10)), var(--white);
-  border-color: rgba(127,205,154,0.35);
+  background: #DBF3E4;
+  border-left: 4px solid #4DAA75;
 }
 .exercise-block.exercise-block--prev-down {
-  background: linear-gradient(0deg, rgba(232,135,135,0.10), rgba(232,135,135,0.10)), var(--white);
-  border-color: rgba(232,135,135,0.35);
+  background: #FBDDDD;
+  border-left: 4px solid #D86161;
+}
+/* Previous-note card inside a tinted exercise stays white so it's still readable */
+.exercise-block.exercise-block--prev-up .prev-note-card,
+.exercise-block.exercise-block--prev-down .prev-note-card {
+  background: var(--white);
 }
 
 /* ── Set row 4-column layout (KG with quick-add, REP) plus optional TIME/DIST row ── */
@@ -736,19 +746,45 @@ a { color: inherit; text-decoration: none; }
   font-weight: 600; text-align: center; color: var(--ink-soft);
 }
 
-/* KG cell: quick-add buttons */
-.set-kg-wrap { display: flex; gap: 4px; align-items: center; }
-.set-kg-wrap input { flex: 1; min-width: 0; text-align: center; }
+/* KG cell: a single rounded input with − and + buttons placed *inside*
+   its left and right edges. The buttons sit on top of the input via
+   absolute positioning so the value field stays a single visual unit
+   and the number remains centered. */
+.set-kg-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+.set-kg-wrap input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  text-align: center;
+  /* Reserve space on both sides so the number doesn't slide under the buttons */
+  padding-left: 36px;
+  padding-right: 36px;
+}
 .kg-bump {
-  width: 28px; height: 36px;
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 32px;
   background: var(--peach-soft);
   color: var(--ink);
-  border: 1px solid var(--gray-soft);
-  border-radius: var(--radius-sm);
-  font-weight: 700; font-size: 16px;
-  cursor: pointer; flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
 }
-.kg-bump:active { background: var(--peach); color: var(--white); transform: scale(0.95); }
+.kg-bump:first-of-type { left: 2px; }
+.kg-bump:last-of-type  { right: 2px; }
+.kg-bump:active { background: var(--peach); color: var(--white); transform: scale(0.93); }
 
 /* Highlight inputs whose value has a target on the SE */
 .set-row input.has-target {

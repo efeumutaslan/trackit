@@ -58,6 +58,7 @@ export default function Session() {
   const [showSaveTmpl, setShowSaveTmpl] = useState(false);
   const [restEnd, setRestEnd] = useState(null); // epoch ms when timer ends, or null
   const [restTotal, setRestTotal] = useState(0); // total seconds for progress bar
+  const [, setTick] = useState(0); // forces a re-render each second while timer runs
 
   const load = useCallback(() => {
     api.get(`/sessions/${id}`).then(setS).catch(() => nav('/sessions'));
@@ -65,12 +66,13 @@ export default function Session() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Tick to redraw the countdown each second.
+  // Tick to redraw the countdown each second. Using a separate counter
+  // because setRestEnd(v => v) bails out (React skips re-renders when the
+  // returned value is the same reference).
   useEffect(() => {
     if (!restEnd) return undefined;
     const t = setInterval(() => {
       if (Date.now() >= restEnd) {
-        // Beep + vibrate when rest ends.
         try {
           const ctx = new (window.AudioContext || window.webkitAudioContext)();
           const o = ctx.createOscillator();
@@ -82,8 +84,7 @@ export default function Session() {
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
         setRestEnd(null);
       } else {
-        // force re-render
-        setRestEnd((v) => v);
+        setTick((n) => n + 1);
       }
     }, 250);
     return () => clearInterval(t);
@@ -688,9 +689,17 @@ function AddExerciseModal({ sessionId, onClose, reload }) {
     api.get('/groups').then(setGroups).catch(() => {});
   }, []);
 
-  const filtered = roster.filter((e) =>
-    e.name.toLowerCase().includes(q.toLowerCase())
-  );
+  // Accent- and case-insensitive search. "kurek" matches "Kürek Çekme",
+  // "GOKDELEN" matches "gökdelen", etc. NFD-decomposes both sides and
+  // strips combining marks before comparing.
+  const normalize = (s) =>
+    (s || '')
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  const nq = normalize(q);
+  const filtered = roster.filter((e) => normalize(e.name).includes(nq));
 
   // Group the filtered roster by group_name for display.
   const grouped = filtered.reduce((acc, e) => {
@@ -810,9 +819,17 @@ function ReplaceExerciseModal({ sessionId, seId, currentExerciseId, onClose, rel
     api.get('/exercises').then(setRoster).catch(() => {});
   }, []);
 
+  // Accent- / case-insensitive search (see AddExerciseModal).
+  const normalize = (s) =>
+    (s || '')
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  const nq = normalize(q);
   const filtered = roster
     .filter((e) => e.id !== currentExerciseId)
-    .filter((e) => e.name.toLowerCase().includes(q.toLowerCase()));
+    .filter((e) => normalize(e.name).includes(nq));
 
   async function pick(exerciseId) {
     await api.post(`/sessions/${sessionId}/exercises/${seId}/replace`, { exercise_id: exerciseId });

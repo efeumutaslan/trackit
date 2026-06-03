@@ -5,6 +5,30 @@ import { api } from '../lib/api.js';
 
 const COLORS = ['#FFB07A','#7AC4FF','#9CD879','#FF7A9C','#C49CFF','#FFD06B','#5BC5C5','#FF8C61','#A28DFE','#FFA8A8','#6FCBA4','#E8A87C'];
 
+// Helpers — kept module-scoped so the AddExerciseModal at the bottom and
+// the per-row inputs above can share them.
+function fmtDurationLocal(seconds) {
+  if (seconds == null || seconds === '') return '';
+  const s = Math.max(0, Math.floor(Number(seconds)));
+  const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+function parseDurationLocal(s) {
+  if (s == null || String(s).trim() === '') return null;
+  const txt = String(s).replace(/[^0-9:]/g, '').trim();
+  if (!txt) return null;
+  if (!txt.includes(':')) {
+    const n = parseInt(txt, 10);
+    return Number.isFinite(n) ? n : null;
+  }
+  const parts = txt.split(':').map((p) => parseInt(p, 10) || 0);
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
 export default function TemplateEdit() {
   const { id } = useParams();
   const isNew = id === 'new';
@@ -26,6 +50,8 @@ export default function TemplateEdit() {
           exercise_name: e.exercise_name,
           target_sets: e.target_sets,
           target_reps: e.target_reps,
+          target_time_s:    e.target_time_s    ?? null,
+          target_mileage_m: e.target_mileage_m ?? null,
         })));
       });
     }
@@ -40,6 +66,8 @@ export default function TemplateEdit() {
         exercise_id: e.exercise_id,
         target_sets: e.target_sets,
         target_reps: e.target_reps,
+        target_time_s: e.target_time_s ?? null,
+        target_mileage_m: e.target_mileage_m ?? null,
       })),
     };
     if (isNew) {
@@ -76,16 +104,18 @@ export default function TemplateEdit() {
     setExercises([...exercises, {
       exercise_id: ex.id,
       exercise_name: ex.name,
-      target_sets: 3,
-      target_reps: '',
+      target_sets:      ex.target_sets      ?? 3,
+      target_reps:      ex.target_reps      ?? '',
+      target_time_s:    ex.target_time_s    ?? null,
+      target_mileage_m: ex.target_mileage_m ?? null,
     }]);
     setShowAdd(false);
   }
 
-  async function createAndAdd(q) {
-    const ex = await api.post('/exercises', { name: q.trim() });
-    setRoster([...roster, ex]);
-    addExercise(ex);
+  async function createAndAdd(q, withTargets) {
+    const created = await api.post('/exercises', { name: q.trim() });
+    setRoster([...roster, created]);
+    addExercise({ ...created, ...(withTargets || {}) });
   }
 
   return (
@@ -154,6 +184,36 @@ export default function TemplateEdit() {
                   }} placeholder="6-10" />
                 </div>
               </div>
+              <div className="row mt-1">
+                <div>
+                  <label className="small text-muted">Target time</label>
+                  <input
+                    value={ex.target_time_s == null ? '' : fmtDurationLocal(ex.target_time_s)}
+                    onChange={(e) => {
+                      const next = [...exercises];
+                      const sec = parseDurationLocal(e.target.value);
+                      next[idx] = { ...ex, target_time_s: sec };
+                      setExercises(next);
+                    }}
+                    placeholder="HH:MM:SS"
+                  />
+                </div>
+                <div>
+                  <label className="small text-muted">Target distance (m)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={ex.target_mileage_m ?? ''}
+                    onChange={(e) => {
+                      const next = [...exercises];
+                      const v = e.target.value.replace(/[^0-9]/g, '');
+                      next[idx] = { ...ex, target_mileage_m: v === '' ? null : parseInt(v, 10) };
+                      setExercises(next);
+                    }}
+                    placeholder="2400"
+                  />
+                </div>
+              </div>
             </div>
           ))
         )}
@@ -177,24 +237,91 @@ export default function TemplateEdit() {
 
 function AddExerciseModal({ roster, existingIds, onAdd, onCreate, onClose }) {
   const [q, setQ] = useState('');
-  const filtered = roster.filter((e) =>
-    e.name.toLowerCase().includes(q.toLowerCase()) && !existingIds.includes(e.id)
+  const [targetSets, setTargetSets] = useState(3);
+  const [targetReps, setTargetReps] = useState('');
+  const [targetTime, setTargetTime] = useState('');
+  const [targetMileage, setTargetMileage] = useState('');
+
+  // Accent- and case-insensitive search.
+  const normalize = (s) =>
+    (s || '')
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  const nq = normalize(q);
+  const filtered = roster.filter(
+    (e) => normalize(e.name).includes(nq) && !existingIds.includes(e.id)
   );
+
+  function parseDuration(s) {
+    if (!s || !s.trim()) return null;
+    const txt = s.trim();
+    if (!txt.includes(':')) {
+      const n = parseInt(txt, 10);
+      return Number.isFinite(n) ? n : null;
+    }
+    const parts = txt.split(':').map((p) => parseInt(p, 10) || 0);
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return null;
+  }
+
+  function withTargets(e) {
+    return {
+      ...e,
+      target_sets: targetSets,
+      target_reps: targetReps,
+      target_time_s: parseDuration(targetTime),
+      target_mileage_m: targetMileage === '' ? null : (parseInt(targetMileage, 10) || null),
+    };
+  }
+
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal modal--search" onClick={(e) => e.stopPropagation()}>
         <div className="modal-sticky">
           <h3>Add exercise</h3>
-          <div className="field" style={{ marginBottom: 0 }}>
+          <div className="field" style={{ marginBottom: 10 }}>
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search or type a new one…" autoFocus />
+          </div>
+          <div className="row" style={{ marginBottom: 6 }}>
+            <div>
+              <label className="small" style={{ color: 'var(--ink-soft)' }}>Sets</label>
+              <input type="number" value={targetSets} onChange={(e) => setTargetSets(+e.target.value)} />
+            </div>
+            <div>
+              <label className="small" style={{ color: 'var(--ink-soft)' }}>Rep range</label>
+              <input value={targetReps} onChange={(e) => setTargetReps(e.target.value)} placeholder="6-10" />
+            </div>
+          </div>
+          <div className="row" style={{ marginBottom: 0 }}>
+            <div>
+              <label className="small" style={{ color: 'var(--ink-soft)' }}>Target time</label>
+              <input
+                value={targetTime}
+                onChange={(e) => setTargetTime(e.target.value.replace(/[^0-9:]/g, ''))}
+                placeholder="HH:MM:SS"
+              />
+            </div>
+            <div>
+              <label className="small" style={{ color: 'var(--ink-soft)' }}>Target distance (m)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={targetMileage}
+                onChange={(e) => setTargetMileage(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="2400"
+              />
+            </div>
           </div>
         </div>
         <div className="modal-scroll">
           {filtered.length === 0 && q.trim() ? (
-            <button className="btn primary" onClick={() => onCreate(q)}>+ Create "{q}" and add</button>
+            <button className="btn primary" onClick={() => onCreate(q, withTargets({}))}>+ Create "{q}" and add</button>
           ) : (
             filtered.map((e) => (
-              <div className="list-row" key={e.id} onClick={() => onAdd(e)}>
+              <div className="list-row" key={e.id} onClick={() => onAdd(withTargets(e))}>
                 <div className="meta"><span>💪</span> {e.name}</div>
                 <span>+</span>
               </div>
