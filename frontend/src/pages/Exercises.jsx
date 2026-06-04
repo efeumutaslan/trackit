@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
+import Icon from '../components/Icon.jsx';
 
 export default function Exercises() {
   const [rows, setRows] = useState([]);
@@ -73,7 +74,7 @@ export default function Exercises() {
               groups.map((g) => (
                 <div key={g.id} className="list-row">
                   <div className="meta">{g.name}</div>
-                  <button className="btn tiny ghost" onClick={() => delGroup(g)}>✕</button>
+                  <button className="btn tiny ghost" onClick={() => delGroup(g)}><Icon name="xmark" /></button>
                 </div>
               ))
             )}
@@ -82,7 +83,7 @@ export default function Exercises() {
 
         {rows.length === 0 ? (
           <div className="empty mt-2">
-            <div className="icon">💪</div>
+            <div className="icon"><Icon name="dumbbell" /></div>
             <div>No exercises yet</div>
           </div>
         ) : (
@@ -93,7 +94,7 @@ export default function Exercises() {
                 <div className="exercise-group__list">
                   {list.map((e) => (
                     <Link to={`/exercises/${e.id}`} key={e.id} className="exercise-pill">
-                      <span>💪</span>
+                      <span><Icon name="dumbbell" /></span>
                       <span>{e.name}</span>
                     </Link>
                   ))}

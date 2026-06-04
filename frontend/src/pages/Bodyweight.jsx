@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
+import Icon from '../components/Icon.jsx';
 
 function fmtDate(iso) {
   if (!iso) return '';
@@ -105,7 +106,7 @@ export default function Bodyweight() {
 
         <div className="section-title">History</div>
         {rows.length === 0 ? (
-          <div className="empty"><div className="icon">⚖️</div><div>No entries yet</div></div>
+          <div className="empty"><div className="icon"><Icon name="scale" /></div><div>No entries yet</div></div>
         ) : (
           rows.map((r) => (
             <div key={r.id} className="list-row">
@@ -115,7 +116,7 @@ export default function Bodyweight() {
                   <div className="small text-muted">{fmtDate(r.log_date)} {r.note && `· ${r.note}`}</div>
                 </div>
               </div>
-              <button className="btn tiny ghost" onClick={() => del(r.id)}>✕</button>
+              <button className="btn tiny ghost" onClick={() => del(r.id)}><Icon name="xmark" /></button>
             </div>
           ))
         )}

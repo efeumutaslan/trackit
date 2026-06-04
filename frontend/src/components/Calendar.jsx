@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import Icon from './Icon.jsx';
 
 function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
 function firstDow(y, m) {
@@ -70,9 +71,9 @@ export default function Calendar({ initialYear, initialMonth } = {}) {
   return (
     <div className="calendar">
       <div className="calendar-head">
-        <button onClick={prev}>‹</button>
+        <button onClick={prev} aria-label="Previous month"><Icon name="chevron-left" /></button>
         <h3>{monthName}</h3>
-        <button onClick={next}>›</button>
+        <button onClick={next} aria-label="Next month"><Icon name="chevron-right" /></button>
       </div>
       <div className="calendar-grid">
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
@@ -124,7 +125,7 @@ export default function Calendar({ initialYear, initialMonth } = {}) {
                   <span className="color-dot" style={{ background: s.template_color || 'var(--gray-soft)' }} />
                   <span style={{ fontWeight: 600 }}>{s.template_name || 'Untitled session'}</span>
                 </div>
-                <span style={{ color: 'var(--gray)' }}>›</span>
+                <span style={{ color: 'var(--gray)' }}><Icon name="chevron-right" /></span>
               </div>
             ))}
             <button className="btn ghost mt-1" onClick={() => setPicker(null)}>Close</button>

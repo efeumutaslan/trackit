@@ -90,7 +90,7 @@ export default function ExerciseEdit() {
             >
               <option value="">— Ungrouped —</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              <option value="__new__">＋ New group…</option>
+              <option value="__new__">+ New group…</option>
             </select>
           </div>
           <div className="field" style={{ marginBottom: 0 }}>

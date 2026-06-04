@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
+import Icon from '../components/Icon.jsx';
 
 export default function Login() {
   const { login, register } = useAuth();
@@ -29,7 +30,7 @@ export default function Login() {
   return (
     <div className="auth-wrap">
       <div className="brand-big">TrackIt</div>
-      <div className="tagline">Track your training 💪</div>
+      <div className="tagline">Track your training</div>
 
       <form onSubmit={submit}>
         {err && <div className="error-box">{err}</div>}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
+import Icon from '../components/Icon.jsx';
 
 export default function Settings() {
   const [settings, setSettings] = useState(null);
@@ -103,10 +104,10 @@ export default function Settings() {
         {/* ── Data ─────────────────────────────────────────────────────── */}
         <div className="section-title">Data</div>
         <div className="card">
-          <button className="btn primary" onClick={exportCsv}>📤 Export all data (CSV)</button>
+          <button className="btn primary" onClick={exportCsv}><Icon name="export" /> Export all data (CSV)</button>
           <div className="mt-2">
             <label className="btn ghost" style={{ display: 'block', textAlign: 'center', cursor: 'pointer' }}>
-              📥 Import from CSV
+              <><Icon name="import" /> Import from CSV</>
               <input type="file" accept=".csv,text/csv" onChange={importCsv} style={{ display: 'none' }} />
             </label>
             {importStatus && <div className="small text-muted mt-1">{importStatus}</div>}

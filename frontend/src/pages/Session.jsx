@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
+import Icon, { MOOD_ICON } from '../components/Icon.jsx';
 
 function fmtTime(iso) {
   if (!iso) return '';
@@ -158,7 +159,7 @@ export default function Session() {
           restEnd
             // Replace the template name with a live countdown while the
             // rest timer is running. ⏱ + remaining seconds.
-            ? `⏱ Rest: ${restRemainingSec}s`
+            ? `Rest: ${restRemainingSec}s`
             : (s.template_name || 'Session')
         }
         right={
@@ -196,7 +197,7 @@ export default function Session() {
               } : startWO}
               style={{ flex: 1 }}
             >
-              ⏱ Start: {s.started_at ? fmtTime(s.started_at) : 'Begin'}
+              <Icon name="stopwatch" /> Start: {s.started_at ? fmtTime(s.started_at) : 'Begin'}
             </button>
             <button
               className="btn sm"
@@ -211,7 +212,7 @@ export default function Session() {
               } : finishWO}
               style={{ flex: 1 }}
             >
-              🏁 Finish: {s.finished_at ? fmtTime(s.finished_at) : 'End'}
+              <Icon name="flag-checkered" /> Finish: {s.finished_at ? fmtTime(s.finished_at) : 'End'}
             </button>
           </div>
           {/* Mood emoji picker appears once the session is finished */}
@@ -243,7 +244,7 @@ export default function Session() {
         {s.prev_workout_notes && (
           <div className="prev-note-card" data-region="prev-note">
             <div className="prev-note-head">
-              <span className="prev-note-icon">📜</span>
+              <span className="prev-note-icon"><Icon name="scroll" /></span>
               {s.prev_workout_mood && (
                 <span className="prev-note-mood">{s.prev_workout_mood}</span>
               )}
@@ -315,9 +316,9 @@ export default function Session() {
               if (!confirm('Apply changes from this session to the template? (Past workouts are unaffected)')) return;
               await api.post(`/sessions/${id}/update-template`);
               alert('Template updated');
-            }}>♻ Update this template</button>
+            }}><Icon name="refresh" /> Update this template</button>
         ) : null}
-        <button className="btn ghost mt-1" onClick={() => setShowSaveTmpl(true)}>💾 Save as template</button>
+        <button className="btn ghost mt-1" onClick={() => setShowSaveTmpl(true)}><Icon name="save" /> Save as template</button>
         </div>
 
         {showAddEx && <AddExerciseModal sessionId={s.id} onClose={() => setShowAddEx(false)} reload={load} />}
@@ -338,7 +339,7 @@ export default function Session() {
             width: `${Math.max(0, Math.min(100, ((restEnd - Date.now()) / (restTotal * 1000)) * 100))}%`,
           }} />
           <div className="rest-timer__text">
-            ⏲ Rest: {Math.max(0, Math.ceil((restEnd - Date.now()) / 1000))}s
+            <Icon name="stopwatch" /> Rest: {Math.max(0, Math.ceil((restEnd - Date.now()) / 1000))}s
           </div>
           <button className="rest-timer__skip" onClick={cancelRest}>Skip</button>
         </div>
@@ -489,10 +490,10 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
             )}
           </div>
           <div className="exercise-head__actions">
-            <button className="btn tiny ghost" onClick={() => move('up')} title="Move up">↑</button>
-            <button className="btn tiny ghost" onClick={() => move('down')} title="Move down">↓</button>
-            <button className="btn tiny ghost" onClick={() => setShowReplace(true)} title="Replace exercise">⇄</button>
-            <button className="btn tiny ghost" onClick={delEx} title="Remove">✕</button>
+            <button className="btn tiny ghost" onClick={() => move('up')} title="Move up"><Icon name="arrow-up" /></button>
+            <button className="btn tiny ghost" onClick={() => move('down')} title="Move down"><Icon name="arrow-down" /></button>
+            <button className="btn tiny ghost" onClick={() => setShowReplace(true)} title="Replace exercise"><Icon name="swap" /></button>
+            <button className="btn tiny ghost" onClick={delEx} title="Remove"><Icon name="xmark" /></button>
           </div>
         </div>
         {/* Bottom row: A/B toggle + settings cog. Always renders even when
@@ -519,7 +520,7 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
               setShowTargets((v) => !v);
             }}
             title="Targets / superset / rest"
-          >⚙</button>
+          ><Icon name="gear" /></button>
         </div>
       </div>
 
@@ -529,7 +530,7 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
         {ex.prev_exercise_notes && (
           <div className="prev-note-card prev-note-card--sm" style={{ marginBottom: 10 }}>
             <div className="prev-note-head">
-              <span className="prev-note-icon">📜</span>
+              <span className="prev-note-icon"><Icon name="scroll" /></span>
               <span className="prev-note-label">Previous exercise note</span>
               {ex.prev_exercise_notes_date && (
                 <span className="prev-note-date">{fmtDate(ex.prev_exercise_notes_date)}</span>
@@ -690,12 +691,12 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
               className={`adjust-btn adjust-up${adjust === 'up' ? ' pressed' : ''}`}
               onClick={() => setAdjustValue('up')}
               title="Plan to go heavier next time"
-            >▲</button>
+            ><Icon name="caret-up" /></button>
             <button
               className={`adjust-btn adjust-down${adjust === 'down' ? ' pressed' : ''}`}
               onClick={() => setAdjustValue('down')}
               title="Plan to back off next time"
-            >▼</button>
+            ><Icon name="caret-down" /></button>
           </div>
         </div>
       </div>
@@ -749,7 +750,7 @@ function AltExerciseInline({ sessionId, seId, currentExerciseId, currentAltId, c
       <label className="small" style={{ color: 'var(--ink-soft)' }}>Alternate exercise (B)</label>
       {currentAltId && !pickerOpen ? (
         <div className="row" style={{ alignItems: 'center' }}>
-          <div className="alt-current">💪 {currentAltName}</div>
+          <div className="alt-current"><Icon name="dumbbell" /> {currentAltName}</div>
           <button className="btn tiny ghost" onClick={() => setPickerOpen(true)}>Change</button>
           <button className="btn tiny ghost" onClick={clearAlt}>Remove</button>
         </div>
@@ -764,7 +765,7 @@ function AltExerciseInline({ sessionId, seId, currentExerciseId, currentAltId, c
           <div className="alt-picker__list">
             {filtered.map((e) => (
               <div key={e.id} className="alt-picker__row" onClick={() => pick(e.id)}>
-                <span>💪 {e.name}</span>
+                <span><Icon name="dumbbell" /> {e.name}</span>
                 <span style={{ color: 'var(--gray)' }}>+</span>
               </div>
             ))}
@@ -1111,7 +1112,7 @@ function AddExerciseModal({ sessionId, onClose, reload }) {
               </div>
               {list.map((e) => (
                 <div className="list-row" key={e.id} onClick={() => add(e.id)}>
-                  <div className="meta"><span>💪</span> {e.name}</div>
+                  <div className="meta"><span><Icon name="dumbbell" /></span> {e.name}</div>
                   <span style={{ color: 'var(--gray)' }}>+</span>
                 </div>
               ))}
@@ -1137,7 +1138,7 @@ function AddExerciseModal({ sessionId, onClose, reload }) {
                 >
                   <option value="">— Ungrouped —</option>
                   {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                  <option value="__new__">＋ New group…</option>
+                  <option value="__new__">+ New group…</option>
                 </select>
               </div>
               <button className="btn primary" onClick={createAndAdd}>+ Create "{q.trim()}" and add</button>
@@ -1205,8 +1206,8 @@ function ReplaceExerciseModal({ sessionId, seId, currentExerciseId, onClose, rel
         <div className="modal-scroll">
           {filtered.map((e) => (
             <div className="list-row" key={e.id} onClick={() => pick(e.id)}>
-              <div className="meta"><span>💪</span> {e.name}</div>
-              <span style={{ color: 'var(--gray)' }}>⇄</span>
+              <div className="meta"><span><Icon name="dumbbell" /></span> {e.name}</div>
+              <span style={{ color: 'var(--gray)' }}><Icon name="swap" /></span>
             </div>
           ))}
           {q.trim() && !exactMatch && (

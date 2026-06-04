@@ -1,11 +1,12 @@
 import { useNavigate } from 'react-router-dom';
+import Icon from './Icon.jsx';
 
 export default function TopBar({ title, back = false, brand = false, brandSuffix = null, right = null, className = '' }) {
   const nav = useNavigate();
   return (
     <header className={`topbar${className ? ' ' + className : ''}`}>
       {back ? (
-        <button className="back" onClick={() => nav(-1)} aria-label="Back">‹</button>
+        <button className="back" onClick={() => nav(-1)} aria-label="Back"><Icon name="chevron-left" /></button>
       ) : (
         <div style={{ width: 36 }} />
       )}

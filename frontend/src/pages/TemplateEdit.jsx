@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
+import Icon from '../components/Icon.jsx';
 
 const COLORS = ['#FFB07A','#7AC4FF','#9CD879','#FF7A9C','#C49CFF','#FFD06B','#5BC5C5','#FF8C61','#A28DFE','#FFA8A8','#6FCBA4','#E8A87C'];
 
@@ -167,9 +168,9 @@ export default function TemplateEdit() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <strong>{ex.exercise_name}</strong>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <button className="btn tiny ghost" onClick={() => move(idx, -1)}>↑</button>
-                  <button className="btn tiny ghost" onClick={() => move(idx, 1)}>↓</button>
-                  <button className="btn tiny ghost" onClick={() => remove(idx)}>✕</button>
+                  <button className="btn tiny ghost" onClick={() => move(idx, -1)}><Icon name="arrow-up" /></button>
+                  <button className="btn tiny ghost" onClick={() => move(idx, 1)}><Icon name="arrow-down" /></button>
+                  <button className="btn tiny ghost" onClick={() => remove(idx)}><Icon name="xmark" /></button>
                 </div>
               </div>
               <div className="row">
@@ -383,7 +384,7 @@ function AddExerciseModal({ roster, existingIds, onAdd, onCreate, onClose }) {
         <div className="modal-scroll">
           {filtered.map((e) => (
             <div className="list-row" key={e.id} onClick={() => onAdd(withTargets(e))}>
-              <div className="meta"><span>💪</span> {e.name}</div>
+              <div className="meta"><span><Icon name="dumbbell" /></span> {e.name}</div>
               <span>+</span>
             </div>
           ))}

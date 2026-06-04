@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
+import Icon from '../components/Icon.jsx';
 
 function fmtDate(iso) {
   if (!iso) return '';
@@ -33,7 +34,7 @@ export default function Sessions() {
         <Link to="/log" className="btn primary mb-2">+ New session</Link>
         {rows.length === 0 ? (
           <div className="empty">
-            <div className="icon">📋</div>
+            <div className="icon"><Icon name="clipboard" /></div>
             <div>No sessions yet</div>
           </div>
         ) : (
@@ -49,7 +50,7 @@ export default function Sessions() {
                       <div className="small text-muted">{fmtDate(s.session_date)}</div>
                     </div>
                   </div>
-                  <span style={{ color: 'var(--gray)' }}>›</span>
+                  <span style={{ color: 'var(--gray)' }}><Icon name="chevron-right" /></span>
                 </Link>
               ))}
             </div>
@@ -78,7 +79,7 @@ export default function Sessions() {
                     </div>
                     <div>{fmtDuration(s.started_at, s.finished_at) || '—'}</div>
                     <div className="data-table__mood">{s.mood || ''}</div>
-                    <div style={{ color: 'var(--gray)' }}>›</div>
+                    <div style={{ color: 'var(--gray)' }}><Icon name="chevron-right" /></div>
                   </Link>
                 ))}
               </div>

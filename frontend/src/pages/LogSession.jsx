@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
+import Icon from '../components/Icon.jsx';
 
 export default function LogSession() {
   const [templates, setTemplates] = useState([]);
@@ -59,7 +60,7 @@ export default function LogSession() {
         <div className="section-title">Choose a template</div>
         {templates.length === 0 ? (
           <div className="empty">
-            <div className="icon">📐</div>
+            <div className="icon"><Icon name="ruler" /></div>
             <div>No templates yet.</div>
             <Link to="/templates/new" className="btn ghost mt-2" style={{ display: 'inline-flex' }}>
               + Add a new template
@@ -76,7 +77,7 @@ export default function LogSession() {
                     <div className="sub">{t.exercises?.length || 0} exercises</div>
                   </div>
                 </div>
-                <span style={{ color: 'var(--gray)' }}>›</span>
+                <span style={{ color: 'var(--gray)' }}><Icon name="chevron-right" /></span>
               </div>
             </div>
           ))

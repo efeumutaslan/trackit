@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
+import Icon from '../components/Icon.jsx';
 
 export default function Templates() {
   const [rows, setRows] = useState([]);
@@ -25,7 +26,7 @@ export default function Templates() {
         <Link to="/templates/new" className="btn primary mb-2">+ New template</Link>
         {rows.length === 0 ? (
           <div className="empty">
-            <div className="icon">📐</div>
+            <div className="icon"><Icon name="ruler" /></div>
             <div>No templates yet</div>
           </div>
         ) : (

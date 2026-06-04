@@ -5,6 +5,7 @@ import Calendar from '../components/Calendar.jsx';
 import Heatmap from '../components/Heatmap.jsx';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import Icon from '../components/Icon.jsx';
 
 function fmtDate(iso) {
   if (!iso) return '';
@@ -121,7 +122,7 @@ export default function Home() {
             <div className="section-title">Recent sessions</div>
             {recent.length === 0 ? (
               <div className="empty">
-                <div className="icon">📋</div>
+                <div className="icon"><Icon name="clipboard" /></div>
                 <div>No sessions yet. Start your first workout!</div>
               </div>
             ) : (
@@ -137,7 +138,7 @@ export default function Home() {
                       <div className="small text-muted">{fmtDate(s.session_date)}</div>
                     </div>
                   </div>
-                  <span style={{ color: 'var(--gray)' }}>›</span>
+                  <span style={{ color: 'var(--gray)' }}><Icon name="chevron-right" /></span>
                 </Link>
               ))
             )}

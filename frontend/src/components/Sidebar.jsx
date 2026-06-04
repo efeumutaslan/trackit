@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
+import Icon from './Icon.jsx';
 
 // Vertical navigation, visible only on >=1024px viewports. The bottom-nav
 // is hidden in the same range, so this becomes the sole nav surface for
@@ -15,27 +16,27 @@ export default function Sidebar() {
       </div>
       <nav className="sidebar-nav">
         <NavLink to="/" end>
-          <span className="icon">🏠</span>
+          <span className="icon"><Icon name="house" fw /></span>
           <span>Home</span>
         </NavLink>
         <NavLink to="/sessions">
-          <span className="icon">📋</span>
+          <span className="icon"><Icon name="clipboard" fw /></span>
           <span>Sessions</span>
         </NavLink>
         <NavLink to="/templates">
-          <span className="icon">📐</span>
+          <span className="icon"><Icon name="ruler" fw /></span>
           <span>Templates</span>
         </NavLink>
         <NavLink to="/exercises">
-          <span className="icon">💪</span>
+          <span className="icon"><Icon name="dumbbell" fw /></span>
           <span>Exercises</span>
         </NavLink>
         <NavLink to="/bodyweight">
-          <span className="icon">⚖️</span>
+          <span className="icon"><Icon name="scale" fw /></span>
           <span>Body</span>
         </NavLink>
         <NavLink to="/settings">
-          <span className="icon">⚙️</span>
+          <span className="icon"><Icon name="gear" fw /></span>
           <span>Settings</span>
         </NavLink>
       </nav>
