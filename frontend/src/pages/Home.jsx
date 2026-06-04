@@ -20,6 +20,10 @@ export default function Home() {
   const [recent, setRecent] = useState([]);
   const [stats, setStats] = useState({ thisWeek: 0, totalSessions: 0, latestBw: null });
   const [view, setView] = useState('month'); // 'month' | 'year'
+  // When the user clicks a month label in the year heatmap we hop into
+  // Month view with that year + month pre-selected. The pair acts as a
+  // key so Calendar re-mounts and picks up the new initial values.
+  const [pendingMonth, setPendingMonth] = useState(null);
 
   useEffect(() => {
     api.get('/sessions').then((rows) => {
@@ -94,7 +98,23 @@ export default function Home() {
                 <button className={view === 'year' ? 'on' : ''} onClick={() => setView('year')}>Year</button>
               </div>
             </div>
-            {view === 'month' ? <Calendar /> : <Heatmap />}
+            {view === 'month'
+              ? (
+                <Calendar
+                  key={pendingMonth ? `${pendingMonth.y}-${pendingMonth.m}` : 'default'}
+                  initialYear={pendingMonth?.y}
+                  initialMonth={pendingMonth?.m}
+                />
+              )
+              : (
+                <Heatmap
+                  onMonthClick={(y, m) => {
+                    setPendingMonth({ y, m });
+                    setView('month');
+                  }}
+                />
+              )
+            }
           </section>
 
           <aside className="home-grid__side">

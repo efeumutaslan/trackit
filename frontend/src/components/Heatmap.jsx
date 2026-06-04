@@ -8,7 +8,7 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 // dropdown; the grid then shows that entire year's workout density.
 // Months are visually separated with a thin vertical line so each block
 // reads as its own chunk rather than one long ribbon of weeks.
-export default function Heatmap() {
+export default function Heatmap({ onMonthClick } = {}) {
   const [byDate, setByDate] = useState({});
   const [year, setYear] = useState(new Date().getFullYear());
   const nav = useNavigate();
@@ -73,13 +73,13 @@ export default function Heatmap() {
   // We also flag those columns so CSS can paint a separator line.
   const monthLabels = cols.map((col, ci) => {
     const dayInYear = col.find((d) => d.inYear);
-    if (!dayInYear) return { label: '', isStart: false };
+    if (!dayInYear) return { label: '', isStart: false, monthIdx: null };
     const m = dayInYear.date.getMonth();
     const prevCol = ci > 0 ? cols[ci - 1] : null;
     const prevDay = prevCol ? prevCol.find((d) => d.inYear) : null;
     const prevM = prevDay ? prevDay.date.getMonth() : -1;
     const isStart = m !== prevM;
-    return { label: isStart ? MONTHS[m] : '', isStart };
+    return { label: isStart ? MONTHS[m] : '', isStart, monthIdx: m };
   });
 
   function dayStyle(list) {
@@ -108,7 +108,22 @@ export default function Heatmap() {
       </div>
       <div className="heatmap-months">
         {monthLabels.map((m, ci) => (
-          <div key={ci} className="heatmap-month">{m.label}</div>
+          <div
+            key={ci}
+            className={`heatmap-month${m.label && onMonthClick ? ' heatmap-month--clickable' : ''}`}
+            // Clicking a month name jumps the parent's view to that
+            // month's Calendar. Only attached when the label is actually
+            // shown (the first column of a month).
+            onClick={() => {
+              if (m.label && onMonthClick && m.monthIdx != null) {
+                // Months are 1-indexed in Calendar's URL/state.
+                onMonthClick(year, m.monthIdx + 1);
+              }
+            }}
+            role={m.label && onMonthClick ? 'button' : undefined}
+          >
+            {m.label}
+          </div>
         ))}
       </div>
       <div className="heatmap-grid">

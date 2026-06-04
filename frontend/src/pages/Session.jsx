@@ -645,6 +645,8 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
               target_mileage_m:ex.target_mileage_m,
             }}
             prevReps={Array.isArray(ex.prev_set_reps) ? ex.prev_set_reps[idx] : null}
+            prevTime={Array.isArray(ex.prev_set_times) ? ex.prev_set_times[idx] : null}
+            prevMileage={Array.isArray(ex.prev_set_mileages) ? ex.prev_set_mileages[idx] : null}
             repPlaceholderMode={settings?.rep_placeholder_mode || 'empty'}
             onSaved={async (evt) => {
               if (evt && evt.kind === 'kg') {
@@ -779,7 +781,7 @@ function AltExerciseInline({ sessionId, seId, currentExerciseId, currentAltId, c
   );
 }
 
-function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, repPlaceholderMode }) {
+function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime, prevMileage, repPlaceholderMode }) {
   // showCols = {kg, time, mileage, rep} — boolean. At least one is always true.
   // targets = optional { target_time_s, target_mileage_m } (from SE level) to
   // visually highlight cells that have a goal.
@@ -899,15 +901,14 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, repPlace
         <div className="set-row set-row--time">
           <div className="set-num" style={{ visibility: 'hidden' }}>{set.set_number}</div>
           {showCols?.time ? (
-            <input
-              type="text"
-              inputMode="numeric"
-              className={`time-input${targets?.target_time_s ? ' has-target' : ''}`}
-              value={tStr}
-              onFocus={selectAll}
-              onChange={(e) => setTStr(e.target.value.replace(/[^0-9:]/g, ''))}
-              onBlur={saveTime}
-              placeholder="HH:MM:SS"
+            <TimeDropdown
+              value={set.time_seconds}
+              prev={prevTime}
+              hasTarget={!!targets?.target_time_s}
+              onCommit={async (sec) => {
+                await api.put(`/sessions/${sessionId}/sets/${set.id}`, { time_seconds: sec });
+                if (onSaved) await onSaved({ kind: 'time' });
+              }}
             />
           ) : <div />}
           {showCols?.mileage ? (
@@ -919,12 +920,71 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, repPlace
               onFocus={selectAll}
               onChange={(e) => setMStr(e.target.value.replace(/[^0-9]/g, ''))}
               onBlur={saveMileage}
-              placeholder="metres"
+              placeholder={prevMileage != null ? String(prevMileage) : 'metres'}
             />
           ) : <div />}
           <div />
         </div>
       )}
+    </div>
+  );
+}
+
+// Time input as three dropdowns (HH / MM / SS). Up to 23:59:59. Lets the
+// user pick a duration with thumb-friendly selects instead of typing a
+// raw HH:MM:SS string. If `prev` is provided (previous session's time),
+// the dropdowns start at that value as a placeholder cue — but we render
+// it as a small inline hint above so the user can see the prior value.
+function TimeDropdown({ value, prev, hasTarget, onCommit }) {
+  const init = (sec) => {
+    const s = sec ?? 0;
+    return {
+      h: Math.floor(s / 3600),
+      m: Math.floor((s % 3600) / 60),
+      s: s % 60,
+    };
+  };
+  const [hms, setHms] = useState(init(value));
+  useEffect(() => { setHms(init(value)); }, [value]);
+
+  const set = (key, v) => {
+    const next = { ...hms, [key]: parseInt(v, 10) || 0 };
+    setHms(next);
+    onCommit(next.h * 3600 + next.m * 60 + next.s);
+  };
+
+  const opts = (max) => {
+    const out = [];
+    for (let i = 0; i <= max; i++) out.push(<option key={i} value={i}>{String(i).padStart(2,'0')}</option>);
+    return out;
+  };
+
+  // Prior value rendered as a faint hint next to the dropdowns when the
+  // current set has no value of its own yet (so we don't shout it once
+  // they've started filling in).
+  const showPrev = (value == null) && (prev != null && prev > 0);
+  const prevFmt = (() => {
+    if (!showPrev) return null;
+    const h = Math.floor(prev / 3600);
+    const m = Math.floor((prev % 3600) / 60);
+    const s = prev % 60;
+    return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':');
+  })();
+
+  return (
+    <div className={`time-dropdown${hasTarget ? ' has-target' : ''}${value == null ? ' is-empty' : ''}`}>
+      <select value={hms.h} onChange={(e) => set('h', e.target.value)} aria-label="Hours">
+        {opts(23)}
+      </select>
+      <span className="time-sep">:</span>
+      <select value={hms.m} onChange={(e) => set('m', e.target.value)} aria-label="Minutes">
+        {opts(59)}
+      </select>
+      <span className="time-sep">:</span>
+      <select value={hms.s} onChange={(e) => set('s', e.target.value)} aria-label="Seconds">
+        {opts(59)}
+      </select>
+      {showPrev && <span className="time-prev-hint" title="Previous">{prevFmt}</span>}
     </div>
   );
 }

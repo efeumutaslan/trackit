@@ -1744,3 +1744,64 @@ a { color: inherit; text-decoration: none; }
   from { background-color: #F44336; }
   to   { background-color: #C62828; }
 }
+
+/* ───── Time-picker dropdowns (HH:MM:SS) ──────────────────────── */
+.time-dropdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--gray-soft);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  padding: 4px 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+.time-dropdown.has-target {
+  background: var(--peach-bg);
+  border-color: var(--peach);
+}
+.time-dropdown.is-empty {
+  background: var(--gray-bg);
+}
+.time-dropdown select {
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  text-align: center;
+  /* iOS Safari likes to render a dropdown indicator that takes space.
+     Compress to just the digits. */
+  background-image: none;
+  padding-right: 0;
+  min-width: 24px;
+  text-align-last: center;
+}
+.time-dropdown .time-sep {
+  color: var(--gray);
+  font-weight: 700;
+}
+.time-dropdown .time-prev-hint {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  background: var(--gray-bg);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* ───── Clickable month labels in the year heatmap ────────────── */
+.heatmap-month--clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 2px;
+  margin-left: -2px;
+  transition: background 0.12s;
+}
+.heatmap-month--clickable:hover { background: var(--peach-soft); color: var(--peach-dark); }

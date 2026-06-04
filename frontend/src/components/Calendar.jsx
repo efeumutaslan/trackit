@@ -9,13 +9,20 @@ function firstDow(y, m) {
   return (d + 6) % 7;
 }
 
-export default function Calendar() {
+export default function Calendar({ initialYear, initialMonth } = {}) {
   const today = new Date();
-  const [y, setY] = useState(today.getFullYear());
-  const [m, setM] = useState(today.getMonth() + 1);
+  const [y, setY] = useState(initialYear ?? today.getFullYear());
+  const [m, setM] = useState(initialMonth ?? (today.getMonth() + 1));
   const [sessions, setSessions] = useState([]);
   const [picker, setPicker] = useState(null); // { date, list } when a day with 2+ sessions is tapped
   const nav = useNavigate();
+
+  // If the parent passes a different initial year/month later (eg user
+  // clicked a month tile in the year heatmap), navigate to it.
+  useEffect(() => {
+    if (initialYear)  setY(initialYear);
+    if (initialMonth) setM(initialMonth);
+  }, [initialYear, initialMonth]);
 
   useEffect(() => {
     api.get(`/sessions/calendar/${y}/${m}`).then(setSessions).catch(() => {});

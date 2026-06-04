@@ -34,66 +34,91 @@ function getPrevExerciseNotes(userId, exerciseId, beforeDate) {
 // Called at creation time (the new session does not exist yet), so we
 // include the same day (<=) and order by created_at to catch a workout
 // logged earlier the same day.
-function getPrevSetWeights(userId, exerciseId, templateId, beforeDate, excludeSessionId) {
+// Find the most recent session for this exercise that the user actually
+// LOGGED data into. A row that exists only as the auto-created placeholder
+// (every set has weight_kg IS NULL AND reps_done IS NULL) is skipped —
+// we want to walk back to the previous time the user actually trained
+// this exercise, not the previous time they merely opened a workout
+// containing it.
+function findPrevLoggedSE(userId, exerciseId, templateId, beforeDate, excludeSessionId) {
   const exclude = excludeSessionId || -1;
-  let sourceSE = null;
+  // Sub-select: SE ids whose sets contain at least one non-null kg or rep.
+  const hasData = `
+    EXISTS (
+      SELECT 1 FROM session_sets ss
+      WHERE ss.session_exercise_id = se.id
+        AND (ss.weight_kg IS NOT NULL OR ss.reps_done IS NOT NULL
+             OR ss.time_seconds IS NOT NULL OR ss.mileage_m IS NOT NULL)
+    )
+  `;
+  let found = null;
   if (templateId) {
-    sourceSE = db.prepare(`
+    found = db.prepare(`
       SELECT se.id FROM session_exercises se
       JOIN workout_sessions ws ON ws.id = se.session_id
       WHERE ws.user_id = ? AND se.exercise_id = ?
         AND ws.template_id = ? AND ws.session_date <= ? AND ws.id != ?
+        AND ${hasData}
       ORDER BY ws.session_date DESC, ws.created_at DESC, ws.id DESC LIMIT 1
     `).get(userId, exerciseId, templateId, beforeDate, exclude);
   }
-  if (!sourceSE) {
-    sourceSE = db.prepare(`
+  if (!found) {
+    found = db.prepare(`
       SELECT se.id FROM session_exercises se
       JOIN workout_sessions ws ON ws.id = se.session_id
       WHERE ws.user_id = ? AND se.exercise_id = ?
         AND ws.session_date <= ? AND ws.id != ?
+        AND ${hasData}
       ORDER BY ws.session_date DESC, ws.created_at DESC, ws.id DESC LIMIT 1
     `).get(userId, exerciseId, beforeDate, exclude);
   }
-  if (!sourceSE) return [];
+  return found ? found.id : null;
+}
+
+function getPrevSetWeights(userId, exerciseId, templateId, beforeDate, excludeSessionId) {
+  const id = findPrevLoggedSE(userId, exerciseId, templateId, beforeDate, excludeSessionId);
+  if (!id) return [];
   const rows = db.prepare(`
     SELECT weight_kg FROM session_sets
     WHERE session_exercise_id = ?
     ORDER BY set_number
-  `).all(sourceSE.id);
+  `).all(id);
   return rows.map((r) => r.weight_kg);
 }
 
 // Same lookup, but returns reps_done. Used for the "Show previous reps"
 // placeholder hint on the rep input.
 function getPrevSetReps(userId, exerciseId, templateId, beforeDate, excludeSessionId) {
-  const exclude = excludeSessionId || -1;
-  let sourceSE = null;
-  if (templateId) {
-    sourceSE = db.prepare(`
-      SELECT se.id FROM session_exercises se
-      JOIN workout_sessions ws ON ws.id = se.session_id
-      WHERE ws.user_id = ? AND se.exercise_id = ?
-        AND ws.template_id = ? AND ws.session_date <= ? AND ws.id != ?
-      ORDER BY ws.session_date DESC, ws.created_at DESC, ws.id DESC LIMIT 1
-    `).get(userId, exerciseId, templateId, beforeDate, exclude);
-  }
-  if (!sourceSE) {
-    sourceSE = db.prepare(`
-      SELECT se.id FROM session_exercises se
-      JOIN workout_sessions ws ON ws.id = se.session_id
-      WHERE ws.user_id = ? AND se.exercise_id = ?
-        AND ws.session_date <= ? AND ws.id != ?
-      ORDER BY ws.session_date DESC, ws.created_at DESC, ws.id DESC LIMIT 1
-    `).get(userId, exerciseId, beforeDate, exclude);
-  }
-  if (!sourceSE) return [];
+  const id = findPrevLoggedSE(userId, exerciseId, templateId, beforeDate, excludeSessionId);
+  if (!id) return [];
   const rows = db.prepare(`
     SELECT reps_done FROM session_sets
     WHERE session_exercise_id = ?
     ORDER BY set_number
-  `).all(sourceSE.id);
+  `).all(id);
   return rows.map((r) => r.reps_done);
+}
+
+// Time and distance — same idea, per-set, ordered by set_number.
+function getPrevSetTimes(userId, exerciseId, templateId, beforeDate, excludeSessionId) {
+  const id = findPrevLoggedSE(userId, exerciseId, templateId, beforeDate, excludeSessionId);
+  if (!id) return [];
+  const rows = db.prepare(`
+    SELECT time_seconds FROM session_sets
+    WHERE session_exercise_id = ?
+    ORDER BY set_number
+  `).all(id);
+  return rows.map((r) => r.time_seconds);
+}
+function getPrevSetMileages(userId, exerciseId, templateId, beforeDate, excludeSessionId) {
+  const id = findPrevLoggedSE(userId, exerciseId, templateId, beforeDate, excludeSessionId);
+  if (!id) return [];
+  const rows = db.prepare(`
+    SELECT mileage_m FROM session_sets
+    WHERE session_exercise_id = ?
+    ORDER BY set_number
+  `).all(id);
+  return rows.map((r) => r.mileage_m);
 }
 
 function loadSession(userId, sessionId) {
@@ -231,10 +256,16 @@ function loadSession(userId, sessionId) {
     }
     ex.prev_weight_adjust = prevAdj?.weight_adjust || '';
 
-    // Per-set previous reps. Used by the UI when the user's setting is
-    // "Show previous reps" — rendered as a faint placeholder on the rep
-    // input so the user can confirm or adjust quickly.
+    // Per-set previous reps / time / mileage. Used by the UI to show
+    // faint placeholder hints on those inputs the same way kg already
+    // does — so the user sees what they did last time before typing.
     ex.prev_set_reps = getPrevSetReps(
+      userId, ex.exercise_id, s.template_id || null, s.session_date, s.id
+    );
+    ex.prev_set_times = getPrevSetTimes(
+      userId, ex.exercise_id, s.template_id || null, s.session_date, s.id
+    );
+    ex.prev_set_mileages = getPrevSetMileages(
       userId, ex.exercise_id, s.template_id || null, s.session_date, s.id
     );
   }
@@ -303,8 +334,9 @@ router.post('/', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insSet = db.prepare(`
-      INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, reps_done)
-      VALUES (?, ?, ?, NULL)
+      INSERT INTO session_sets
+        (session_exercise_id, set_number, weight_kg, reps_done, time_seconds, mileage_m)
+      VALUES (?, ?, ?, NULL, ?, ?)
     `);
     exToInsert.forEach((ex, idx) => {
       const prevNote = getPrevExerciseNotes(req.userId, ex.exercise_id, date);
@@ -317,10 +349,19 @@ router.post('/', (req, res) => {
       );
       const seId = seInfo.lastInsertRowid;
       const setsCount = ex.target_sets || 3;
-      const prevWeights = getPrevSetWeights(req.userId, ex.exercise_id, template_id || null, date, sid);
+      // Pre-fill weight, time and mileage from the most recent prior
+      // session that the user actually logged data in. Same recall
+      // behaviour as kg → the user sees their last numbers and only
+      // changes what's different. Reps are left blank to nudge fresh
+      // entry (and to match the existing "Show previous reps" hint).
+      const prevWeights  = getPrevSetWeights (req.userId, ex.exercise_id, template_id || null, date, sid);
+      const prevTimes    = getPrevSetTimes   (req.userId, ex.exercise_id, template_id || null, date, sid);
+      const prevMileages = getPrevSetMileages(req.userId, ex.exercise_id, template_id || null, date, sid);
       for (let i = 1; i <= setsCount; i++) {
-        const w = prevWeights[i - 1] != null ? prevWeights[i - 1] : null;
-        insSet.run(seId, i, w);
+        const w = prevWeights [i - 1] != null ? prevWeights [i - 1] : null;
+        const t = prevTimes   [i - 1] != null ? prevTimes   [i - 1] : null;
+        const m = prevMileages[i - 1] != null ? prevMileages[i - 1] : null;
+        insSet.run(seId, i, w, t, m);
       }
     });
     return sid;
@@ -419,10 +460,18 @@ router.post('/:id/exercises', (req, res) => {
     prevNote
   );
   const seId = info.lastInsertRowid;
-  const prevWeights = getPrevSetWeights(req.userId, exercise_id, cur.template_id || null, cur.session_date, cur.id);
+  // Same prev-recall as in session POST: kg + time + mileage carry over.
+  const prevWeights  = getPrevSetWeights (req.userId, exercise_id, cur.template_id || null, cur.session_date, cur.id);
+  const prevTimes    = getPrevSetTimes   (req.userId, exercise_id, cur.template_id || null, cur.session_date, cur.id);
+  const prevMileages = getPrevSetMileages(req.userId, exercise_id, cur.template_id || null, cur.session_date, cur.id);
+  const ins = db.prepare(
+    'INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, time_seconds, mileage_m) VALUES (?, ?, ?, ?, ?)'
+  );
   for (let i = 1; i <= (target_sets || 3); i++) {
-    const w = prevWeights[i - 1] != null ? prevWeights[i - 1] : null;
-    db.prepare('INSERT INTO session_sets (session_exercise_id, set_number, weight_kg) VALUES (?, ?, ?)').run(seId, i, w);
+    const w = prevWeights [i - 1] != null ? prevWeights [i - 1] : null;
+    const t = prevTimes   [i - 1] != null ? prevTimes   [i - 1] : null;
+    const m = prevMileages[i - 1] != null ? prevMileages[i - 1] : null;
+    ins.run(seId, i, w, t, m);
   }
   res.json(loadSession(req.userId, id));
 });
@@ -543,14 +592,19 @@ router.post('/:id/exercises/:seId/replace', (req, res) => {
     UPDATE session_exercises SET exercise_id = ?, prev_exercise_notes = ?, weight_adjust = NULL
     WHERE id = ?
   `).run(newExerciseId, newPrevNote, me.id);
-  // Also refresh set kg prefills for the new exercise (only if all sets are empty)
-  const sets = db.prepare('SELECT id, weight_kg FROM session_sets WHERE session_exercise_id = ? ORDER BY set_number').all(me.id);
-  const allEmpty = sets.every((s) => s.weight_kg == null);
+  // Also refresh prefills for the new exercise (only if all sets are empty).
+  const sets = db.prepare('SELECT id, weight_kg, time_seconds, mileage_m FROM session_sets WHERE session_exercise_id = ? ORDER BY set_number').all(me.id);
+  const allEmpty = sets.every((s) => s.weight_kg == null && s.time_seconds == null && s.mileage_m == null);
   if (allEmpty) {
-    const prevWeights = getPrevSetWeights(req.userId, newExerciseId, cur.template_id || null, cur.session_date, cur.id);
+    const prevWeights  = getPrevSetWeights (req.userId, newExerciseId, cur.template_id || null, cur.session_date, cur.id);
+    const prevTimes    = getPrevSetTimes   (req.userId, newExerciseId, cur.template_id || null, cur.session_date, cur.id);
+    const prevMileages = getPrevSetMileages(req.userId, newExerciseId, cur.template_id || null, cur.session_date, cur.id);
+    const upd = db.prepare('UPDATE session_sets SET weight_kg = ?, time_seconds = ?, mileage_m = ? WHERE id = ?');
     sets.forEach((s, i) => {
-      const w = prevWeights[i] != null ? prevWeights[i] : null;
-      if (w != null) db.prepare('UPDATE session_sets SET weight_kg = ? WHERE id = ?').run(w, s.id);
+      const w = prevWeights [i] != null ? prevWeights [i] : null;
+      const t = prevTimes   [i] != null ? prevTimes   [i] : null;
+      const m = prevMileages[i] != null ? prevMileages[i] : null;
+      upd.run(w, t, m, s.id);
     });
   }
   res.json({ ok: true });
