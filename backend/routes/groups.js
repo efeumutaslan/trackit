@@ -15,10 +15,22 @@ router.get('/', (req, res) => {
 router.post('/', (req, res) => {
   const { name } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+  const cleanName = name.trim();
   try {
+    // If an archived group with this exact name already exists, resurrect
+    // it instead of failing the UNIQUE(user_id, name) constraint. This
+    // means the user can delete a group and later recreate it under the
+    // same name without getting stuck.
+    const archived = db
+      .prepare('SELECT * FROM exercise_groups WHERE user_id = ? AND name = ? AND archived = 1')
+      .get(req.userId, cleanName);
+    if (archived) {
+      db.prepare('UPDATE exercise_groups SET archived = 0 WHERE id = ?').run(archived.id);
+      return res.json(db.prepare('SELECT * FROM exercise_groups WHERE id = ?').get(archived.id));
+    }
     const info = db
       .prepare('INSERT INTO exercise_groups (user_id, name) VALUES (?, ?)')
-      .run(req.userId, name.trim());
+      .run(req.userId, cleanName);
     res.json(db.prepare('SELECT * FROM exercise_groups WHERE id = ?').get(info.lastInsertRowid));
   } catch (e) {
     if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') {

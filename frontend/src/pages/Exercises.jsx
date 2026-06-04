@@ -49,8 +49,8 @@ export default function Exercises() {
       <TopBar back title="Exercises" />
       <div className="content">
         <div style={{ display: 'flex', gap: 8 }}>
-          <Link to="/exercises/new" className="btn primary" style={{ flex: 1 }}>+ New exercise</Link>
-          <button className="btn ghost" onClick={() => setShowGroupsMgr((v) => !v)}>
+          <Link to="/exercises/new" className="btn primary" style={{ flex: 1, whiteSpace: 'nowrap' }}>+ New exercise</Link>
+          <button className="btn ghost" style={{ flex: 1, whiteSpace: 'nowrap' }} onClick={() => setShowGroupsMgr((v) => !v)}>
             {showGroupsMgr ? 'Hide groups' : 'Manage groups'}
           </button>
         </div>

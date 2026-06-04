@@ -136,9 +136,22 @@ function loadSession(userId, sessionId) {
     ORDER BY se.order_idx
   `).all(sessionId);
   for (const ex of exercises) {
+    // Sets and notes/adjust are tracked per side (A = alt_active 0, B = 1).
+    // The currently-active side's data is what the UI logs against.
+    const activeSide = ex.alt_active ? 1 : 0;
     ex.sets = db.prepare(
-      'SELECT * FROM session_sets WHERE session_exercise_id = ? ORDER BY set_number'
-    ).all(ex.id);
+      'SELECT * FROM session_sets WHERE session_exercise_id = ? AND alt_active = ? ORDER BY set_number'
+    ).all(ex.id, activeSide);
+    // Expose the inactive side's set count so the UI can hint "B has N saved sets" if needed
+    ex.other_side_set_count = db.prepare(
+      'SELECT COUNT(*) AS n FROM session_sets WHERE session_exercise_id = ? AND alt_active = ?'
+    ).get(ex.id, activeSide ? 0 : 1).n;
+    // Surface the active side's notes / adjust as the "exercise_notes"
+    // and "weight_adjust" fields the frontend already binds to.
+    if (activeSide === 1) {
+      ex.exercise_notes = ex.alt_exercise_notes;
+      ex.weight_adjust  = ex.alt_weight_adjust;
+    }
     const totals = ex.sets.reduce(
       (acc, s) => {
         if (s.weight_kg && s.reps_done) acc.tonnage += s.weight_kg * s.reps_done;
@@ -274,7 +287,8 @@ router.post('/', (req, res) => {
       // copy exercises from the template
       exToInsert = db.prepare(`
         SELECT exercise_id, order_idx, target_sets, target_reps,
-               target_time_s, target_mileage_m, alt_exercise_id
+               target_time_s, target_mileage_m, alt_exercise_id,
+               superset_tag, rest_seconds
         FROM template_exercises WHERE template_id = ?
         ORDER BY order_idx
       `).all(template_id);
@@ -284,8 +298,9 @@ router.post('/', (req, res) => {
     const insSE = db.prepare(`
       INSERT INTO session_exercises
         (session_id, exercise_id, order_idx, target_sets, target_reps,
-         target_time_s, target_mileage_m, prev_exercise_notes, alt_exercise_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         target_time_s, target_mileage_m, prev_exercise_notes, alt_exercise_id,
+         superset_tag, rest_seconds)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insSet = db.prepare(`
       INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, reps_done)
@@ -297,7 +312,8 @@ router.post('/', (req, res) => {
         sid, ex.exercise_id, idx,
         ex.target_sets || 3, ex.target_reps || '',
         ex.target_time_s || null, ex.target_mileage_m || null,
-        prevNote, ex.alt_exercise_id || null
+        prevNote, ex.alt_exercise_id || null,
+        ex.superset_tag || '', ex.rest_seconds || null
       );
       const seId = seInfo.lastInsertRowid;
       const setsCount = ex.target_sets || 3;
@@ -423,15 +439,28 @@ router.put('/:id/exercises/:seId', (req, res) => {
     superset_tag, rest_seconds, target_time_s, target_mileage_m,
     alt_exercise_id, alt_active,
   } = req.body || {};
+
+  // notes/adjust apply to whichever side is currently active. When the
+  // toggle flips, the caller still sends "exercise_notes" — we route it
+  // into the right column.
+  const newAltActive = alt_active !== undefined ? (alt_active ? 1 : 0) : se.alt_active;
+  const editingSideA = newAltActive === 0;
+  const aNotes  = (editingSideA && exercise_notes !== undefined) ? exercise_notes : se.exercise_notes;
+  const aAdjust = (editingSideA && weight_adjust  !== undefined) ? weight_adjust  : se.weight_adjust;
+  const bNotes  = (!editingSideA && exercise_notes !== undefined) ? exercise_notes : se.alt_exercise_notes;
+  const bAdjust = (!editingSideA && weight_adjust  !== undefined) ? weight_adjust  : se.alt_weight_adjust;
+
   db.prepare(`
     UPDATE session_exercises
-    SET exercise_notes = ?, weight_adjust = ?, target_reps = ?, target_sets = ?,
+    SET exercise_notes = ?, weight_adjust = ?,
+        alt_exercise_notes = ?, alt_weight_adjust = ?,
+        target_reps = ?, target_sets = ?,
         superset_tag = ?, rest_seconds = ?, target_time_s = ?, target_mileage_m = ?,
         alt_exercise_id = ?, alt_active = ?
     WHERE id = ?
   `).run(
-    exercise_notes   ?? se.exercise_notes,
-    weight_adjust    ?? se.weight_adjust,
+    aNotes, aAdjust,
+    bNotes, bAdjust,
     target_reps      ?? se.target_reps,
     target_sets      ?? se.target_sets,
     superset_tag     ?? se.superset_tag,
@@ -439,9 +468,26 @@ router.put('/:id/exercises/:seId', (req, res) => {
     target_time_s    !== undefined ? target_time_s    : se.target_time_s,
     target_mileage_m !== undefined ? target_mileage_m : se.target_mileage_m,
     alt_exercise_id  !== undefined ? alt_exercise_id  : se.alt_exercise_id,
-    alt_active       !== undefined ? (alt_active ? 1 : 0) : se.alt_active,
+    newAltActive,
     seId
   );
+
+  // If we just flipped to a side that has no sets yet, lazily create
+  // target_sets empty rows for that side so the UI has something to
+  // render. This is the moment a user first toggles A→B.
+  if (alt_active !== undefined) {
+    const existing = db.prepare(
+      'SELECT COUNT(*) AS n FROM session_sets WHERE session_exercise_id = ? AND alt_active = ?'
+    ).get(seId, newAltActive).n;
+    if (existing === 0) {
+      const targetN = se.target_sets || 3;
+      const ins = db.prepare(
+        'INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, alt_active) VALUES (?, ?, NULL, ?)'
+      );
+      for (let i = 1; i <= targetN; i++) ins.run(seId, i, newAltActive);
+    }
+  }
+
   res.json({ ok: true });
 });
 
@@ -552,9 +598,15 @@ router.post('/:id/exercises/:seId/sets', (req, res) => {
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
   if (!cur) return res.status(404).json({ error: 'Not found' });
-  const max = db.prepare('SELECT COALESCE(MAX(set_number), 0) AS m FROM session_sets WHERE session_exercise_id = ?').get(seId).m;
-  const info = db.prepare('INSERT INTO session_sets (session_exercise_id, set_number) VALUES (?, ?)')
-    .run(seId, max + 1);
+  const se = db.prepare('SELECT alt_active FROM session_exercises WHERE id = ? AND session_id = ?').get(seId, id);
+  if (!se) return res.status(404).json({ error: 'Exercise not found' });
+  const side = se.alt_active ? 1 : 0;
+  const max = db.prepare(
+    'SELECT COALESCE(MAX(set_number), 0) AS m FROM session_sets WHERE session_exercise_id = ? AND alt_active = ?'
+  ).get(seId, side).m;
+  const info = db.prepare(
+    'INSERT INTO session_sets (session_exercise_id, set_number, alt_active) VALUES (?, ?, ?)'
+  ).run(seId, max + 1, side);
   res.json({ id: info.lastInsertRowid, set_number: max + 1 });
 });
 
@@ -577,7 +629,8 @@ router.post('/:id/save-as-template', (req, res) => {
   if (!cur) return res.status(404).json({ error: 'Session not found' });
   const ses = db.prepare(`
     SELECT exercise_id, order_idx, target_sets, target_reps,
-           target_time_s, target_mileage_m, alt_exercise_id
+           target_time_s, target_mileage_m, alt_exercise_id,
+           superset_tag, rest_seconds
     FROM session_exercises WHERE session_id = ? ORDER BY order_idx
   `).all(id);
   const txn = db.transaction(() => {
@@ -586,13 +639,15 @@ router.post('/:id/save-as-template', (req, res) => {
     const ins = db.prepare(`
       INSERT INTO template_exercises
         (template_id, exercise_id, order_idx, target_sets, target_reps,
-         target_time_s, target_mileage_m, alt_exercise_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         target_time_s, target_mileage_m, alt_exercise_id,
+         superset_tag, rest_seconds)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     ses.forEach(s => ins.run(
       t.lastInsertRowid, s.exercise_id, s.order_idx,
       s.target_sets, s.target_reps, s.target_time_s, s.target_mileage_m,
-      s.alt_exercise_id || null
+      s.alt_exercise_id || null,
+      s.superset_tag || '', s.rest_seconds || null
     ));
     db.prepare('UPDATE workout_sessions SET template_id = ? WHERE id = ?').run(t.lastInsertRowid, id);
     return t.lastInsertRowid;
@@ -610,7 +665,8 @@ router.post('/:id/update-template', (req, res) => {
   if (!cur.template_id) return res.status(400).json({ error: 'This session was not started from a template' });
   const ses = db.prepare(`
     SELECT exercise_id, order_idx, target_sets, target_reps,
-           target_time_s, target_mileage_m, alt_exercise_id
+           target_time_s, target_mileage_m, alt_exercise_id,
+           superset_tag, rest_seconds
     FROM session_exercises WHERE session_id = ? ORDER BY order_idx
   `).all(id);
   const txn = db.transaction(() => {
@@ -618,13 +674,15 @@ router.post('/:id/update-template', (req, res) => {
     const ins = db.prepare(`
       INSERT INTO template_exercises
         (template_id, exercise_id, order_idx, target_sets, target_reps,
-         target_time_s, target_mileage_m, alt_exercise_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         target_time_s, target_mileage_m, alt_exercise_id,
+         superset_tag, rest_seconds)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     ses.forEach(s => ins.run(
       cur.template_id, s.exercise_id, s.order_idx,
       s.target_sets, s.target_reps, s.target_time_s, s.target_mileage_m,
-      s.alt_exercise_id || null
+      s.alt_exercise_id || null,
+      s.superset_tag || '', s.rest_seconds || null
     ));
   });
   txn();

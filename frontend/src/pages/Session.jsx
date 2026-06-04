@@ -140,7 +140,13 @@ export default function Session() {
     <div className="app-shell page-session">
       <TopBar
         back
-        title={s.template_name || 'Session'}
+        title={
+          restEnd
+            // Replace the template name with a live countdown while the
+            // rest timer is running. ⏱ + remaining seconds.
+            ? `⏱ Rest: ${Math.max(0, Math.ceil((restEnd - Date.now()) / 1000))}s`
+            : (s.template_name || 'Session')
+        }
         right={
           <button className="right-action" onClick={delSession} style={{ color: 'var(--red)' }}>Delete</button>
         }
@@ -160,22 +166,8 @@ export default function Session() {
             />
           </div>
 
-          {/* Display mode: collapsed accordion (Expandable, default) vs.
-              always-open (Fixed). Persisted on the session itself, so the
-              choice survives navigating away and coming back. */}
-          <div className="field">
-            <label>Display</label>
-            <div className="seg-group">
-              <button
-                className={`seg-btn${s.expand_mode !== 'fixed' ? ' on' : ''}`}
-                onClick={() => saveMeta({ expand_mode: 'expandable' })}
-              >Expandable</button>
-              <button
-                className={`seg-btn${s.expand_mode === 'fixed' ? ' on' : ''}`}
-                onClick={() => saveMeta({ expand_mode: 'fixed' })}
-              >Fixed</button>
-            </div>
-          </div>
+          {/* Display mode toggle now lives next to the Exercises section
+              title — see below. The dedicated row here was removed. */}
           <div className="row">
             <button
               className="btn sm"
@@ -251,7 +243,19 @@ export default function Session() {
         )}
 
         <div data-region="exercises">
-          <div className="section-title">Exercises</div>
+          <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Exercises</span>
+            {/* Expandable / Fixed lives here now. When on, exercise cards
+                collapse to their head until tapped; when off, every card
+                is always open. The choice persists on the session row. */}
+            <button
+              className={`expand-toggle${s.expand_mode !== 'fixed' ? ' on' : ''}`}
+              onClick={() => saveMeta({ expand_mode: s.expand_mode === 'fixed' ? 'expandable' : 'fixed' })}
+              title="Tap exercise cards to expand"
+            >
+              {s.expand_mode === 'fixed' ? 'Fixed' : 'Expandable'}
+            </button>
+          </div>
           {s.exercises.map((ex, idx) => {
             // A run of consecutive exercises sharing the same superset_tag
             // forms a visual cluster — the first card has rounded top, the
@@ -344,6 +348,13 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
   // shows the head. In 'fixed' mode it's always open. Per-card local state
   // so the user can open/close individually within an expandable session.
   const [expanded, setExpanded] = useState(expandMode === 'fixed');
+  // When the session-level mode flips (Fixed ⇄ Expandable), reset every
+  // card's expansion state immediately. Without this the local 'expanded'
+  // stays stale and the cards look unchanged until the user reopens the
+  // session.
+  useEffect(() => {
+    setExpanded(expandMode === 'fixed');
+  }, [expandMode]);
   const isCollapsed = expandMode === 'expandable' && !expanded;
 
   // A/B alternate exercise — show the name of whichever one is currently
@@ -443,35 +454,49 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
         }}
         style={{ cursor: expandMode === 'expandable' ? 'pointer' : 'default' }}
       >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h4 style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-            {ex.superset_tag && <span className="superset-badge">{ex.superset_tag}</span>}
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeName}</span>
-            {hasAlt && (
-              <span className="alt-toggle" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className={`alt-toggle__btn${!ex.alt_active ? ' on' : ''}`}
-                  onClick={() => api.put(`/sessions/${sessionId}/exercises/${ex.id}`, { alt_active: 0 }).then(reload)}
-                  title={ex.exercise_name}
-                >A</button>
-                <button
-                  className={`alt-toggle__btn${ex.alt_active ? ' on' : ''}`}
-                  onClick={() => api.put(`/sessions/${sessionId}/exercises/${ex.id}`, { alt_active: 1 }).then(reload)}
-                  title={ex.alt_exercise_name}
-                >B</button>
-              </span>
+        {/* Top row: exercise name on the left, move / replace / delete on the right */}
+        <div className="exercise-head__top">
+          <div className="exercise-head__name-wrap">
+            <h4 className="exercise-head__name">
+              {ex.superset_tag && <span className="superset-badge">{ex.superset_tag}</span>}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeName}</span>
+            </h4>
+            {isCollapsed && summary && (
+              <div className="small text-muted exercise-head__summary">{summary}</div>
             )}
-          </h4>
-          {isCollapsed && summary && (
-            <div className="small text-muted exercise-head__summary">{summary}</div>
-          )}
+          </div>
+          <div className="exercise-head__actions">
+            <button className="btn tiny ghost" onClick={() => move('up')} title="Move up">↑</button>
+            <button className="btn tiny ghost" onClick={() => move('down')} title="Move down">↓</button>
+            <button className="btn tiny ghost" onClick={() => setShowReplace(true)} title="Replace exercise">⇄</button>
+            <button className="btn tiny ghost" onClick={delEx} title="Remove">✕</button>
+          </div>
         </div>
-        <div className="exercise-head__actions" style={{ display: 'flex', gap: 4 }}>
-          <button className="btn tiny ghost" onClick={() => setShowTargets((v) => !v)} title="Targets / superset / rest">⚙</button>
-          <button className="btn tiny ghost" onClick={() => move('up')} title="Move up">↑</button>
-          <button className="btn tiny ghost" onClick={() => move('down')} title="Move down">↓</button>
-          <button className="btn tiny ghost" onClick={() => setShowReplace(true)} title="Replace exercise">⇄</button>
-          <button className="btn tiny ghost" onClick={delEx} title="Remove">✕</button>
+        {/* Bottom row: A/B toggle + settings cog. Always renders even when
+            there is no alternate so the cog has a stable home. */}
+        <div className="exercise-head__bottom" onClick={(e) => e.stopPropagation()}>
+          {hasAlt ? (
+            <span className="alt-toggle">
+              <button
+                className={`alt-toggle__btn${!ex.alt_active ? ' on' : ''}`}
+                onClick={() => api.put(`/sessions/${sessionId}/exercises/${ex.id}`, { alt_active: 0 }).then(reload)}
+                title={ex.exercise_name}
+              >A</button>
+              <button
+                className={`alt-toggle__btn${ex.alt_active ? ' on' : ''}`}
+                onClick={() => api.put(`/sessions/${sessionId}/exercises/${ex.id}`, { alt_active: 1 }).then(reload)}
+                title={ex.alt_exercise_name}
+              >B</button>
+            </span>
+          ) : <span />}
+          <button
+            className="btn tiny ghost"
+            onClick={() => {
+              if (expandMode === 'expandable' && !expanded) setExpanded(true);
+              setShowTargets((v) => !v);
+            }}
+            title="Targets / superset / rest"
+          >⚙</button>
         </div>
       </div>
 

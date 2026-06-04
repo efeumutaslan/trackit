@@ -173,6 +173,18 @@ a { color: inherit; text-decoration: none; }
   box-shadow: var(--shadow-sm);
   transition: transform 0.1s, box-shadow 0.15s;
   width: 100%;
+  /* Reset iOS / Safari default chrome on <button> and <a>. Without this,
+     Safari paints its own subtle inner highlight which makes solid-fill
+     buttons (e.g. peach Save) look like they have a double bottom edge
+     and faded text. */
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  text-decoration: none;
+  text-align: center;
 }
 .btn:hover { transform: translateY(-1px); }
 .btn:active { transform: translateY(0); }
@@ -618,9 +630,12 @@ a { color: inherit; text-decoration: none; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 .welcome-bar__cta {
   flex-shrink: 0;
+  width: auto;
   padding: 10px 14px;
   font-size: 14px;
 }
@@ -1501,4 +1516,126 @@ a { color: inherit; text-decoration: none; }
     box-shadow: var(--shadow-sm);
     margin-bottom: 8px;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   QoL pass 3 additions
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Expandable toggle next to the "Exercises" section title. Small pill,
+   coloured when in expandable mode (the default), greyed when fixed. */
+.expand-toggle {
+  background: var(--gray-bg);
+  border: 1px solid var(--gray-soft);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.expand-toggle.on {
+  background: var(--peach-soft);
+  color: var(--peach-dark);
+  border-color: var(--peach);
+}
+
+/* Exercise card head — two rows:
+   • top: name (+ summary when collapsed) on the left, action buttons on the right
+   • bottom: A/B toggle on the left, ⚙ on the right */
+.exercise-head__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.exercise-head__name-wrap {
+  flex: 1;
+  min-width: 0;
+}
+.exercise-head__name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.25;
+}
+.exercise-head__actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.exercise-head__actions .btn.tiny {
+  padding: 4px 8px;
+  min-width: 28px;
+  font-size: 14px;
+}
+.exercise-head__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--gray-bg);
+  gap: 8px;
+}
+.exercise-head__bottom .btn.tiny {
+  padding: 4px 8px;
+}
+/* The alt-toggle (A|B pill) lives in the bottom row now. Was previously
+   inside the h4 inline; the styling stays the same — keep it compact. */
+.exercise-head__bottom .alt-toggle {
+  margin-left: 0;
+}
+
+/* Heatmap toolbar — year picker dropdown sits above the grid */
+.heatmap-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+.heatmap-year {
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 1px solid var(--gray-soft);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  font-family: inherit;
+}
+/* Thin vertical line between months. The column whose first in-year day
+   starts a new month gets a 1px left border. The first column of the year
+   never carries one (handled in JSX with ci > 0). */
+.heatmap-col.month-start {
+  border-left: 1px solid var(--gray-soft);
+  padding-left: 3px;
+  margin-left: 1px;
+}
+/* Cells that fall outside the selected year (leading/trailing pad) stay
+   invisible — they're spacers only. */
+.heatmap-cell.outside {
+  background: transparent !important;
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+/* Brand suffix on the topbar: "TrackIt — dafather"
+   The separator stays neutral, the username uses the normal ink colour. */
+.topbar .brand-sep {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.topbar .brand-suffix {
+  color: var(--ink);
+  font-weight: 700;
 }

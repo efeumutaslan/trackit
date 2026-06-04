@@ -53,6 +53,8 @@ export default function TemplateEdit() {
           target_time_s:    e.target_time_s    ?? null,
           target_mileage_m: e.target_mileage_m ?? null,
           alt_exercise_id:  e.alt_exercise_id  ?? null,
+          superset_tag:     e.superset_tag     ?? '',
+          rest_seconds:     e.rest_seconds     ?? null,
         })));
       });
     }
@@ -70,6 +72,8 @@ export default function TemplateEdit() {
         target_time_s: e.target_time_s ?? null,
         target_mileage_m: e.target_mileage_m ?? null,
         alt_exercise_id: e.alt_exercise_id ?? null,
+        superset_tag: e.superset_tag ?? '',
+        rest_seconds: e.rest_seconds ?? null,
       })),
     };
     if (isNew) {
@@ -218,7 +222,7 @@ export default function TemplateEdit() {
               </div>
               {/* A/B alternate — pre-pair an exercise here so the session
                   can toggle to it without having to use Replace. */}
-              <div className="field mt-1" style={{ marginBottom: 0 }}>
+              <div className="field mt-1">
                 <label className="small text-muted">Alternate exercise (B) — optional</label>
                 <select
                   value={ex.alt_exercise_id ?? ''}
@@ -236,6 +240,38 @@ export default function TemplateEdit() {
                       <option key={r.id} value={r.id}>{r.name}</option>
                     ))}
                 </select>
+              </div>
+              {/* Superset pre-grouping: any two rows sharing the same tag
+                  (A, B, ...) will be visually merged inside the session.
+                  Rest seconds applies to this exercise's rest timer. */}
+              <div className="row mt-1">
+                <div>
+                  <label className="small text-muted">Superset tag (A, B…)</label>
+                  <input
+                    value={ex.superset_tag || ''}
+                    onChange={(e) => {
+                      const next = [...exercises];
+                      next[idx] = { ...ex, superset_tag: e.target.value.toUpperCase().slice(0, 2) };
+                      setExercises(next);
+                    }}
+                    placeholder="A"
+                  />
+                </div>
+                <div>
+                  <label className="small text-muted">Rest (sec)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={ex.rest_seconds ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^0-9]/g, '');
+                      const next = [...exercises];
+                      next[idx] = { ...ex, rest_seconds: v === '' ? null : parseInt(v, 10) };
+                      setExercises(next);
+                    }}
+                    placeholder="90"
+                  />
+                </div>
               </div>
             </div>
           ))
@@ -276,6 +312,11 @@ function AddExerciseModal({ roster, existingIds, onAdd, onCreate, onClose }) {
   const filtered = roster.filter(
     (e) => normalize(e.name).includes(nq) && !existingIds.includes(e.id)
   );
+  // Offer to "+ Create" as long as the typed name doesn't EXACTLY match
+  // one of the existing roster entries (case- and accent-folded). This
+  // means typing "kürek" when "kürek çekme" already exists still lets
+  // the user create plain "kürek".
+  const exactMatch = roster.some((e) => normalize(e.name) === nq && nq !== '');
 
   function parseDuration(s) {
     if (!s || !s.trim()) return null;
@@ -340,15 +381,16 @@ function AddExerciseModal({ roster, existingIds, onAdd, onCreate, onClose }) {
           </div>
         </div>
         <div className="modal-scroll">
-          {filtered.length === 0 && q.trim() ? (
-            <button className="btn primary" onClick={() => onCreate(q, withTargets({}))}>+ Create "{q}" and add</button>
-          ) : (
-            filtered.map((e) => (
-              <div className="list-row" key={e.id} onClick={() => onAdd(withTargets(e))}>
-                <div className="meta"><span>💪</span> {e.name}</div>
-                <span>+</span>
-              </div>
-            ))
+          {filtered.map((e) => (
+            <div className="list-row" key={e.id} onClick={() => onAdd(withTargets(e))}>
+              <div className="meta"><span>💪</span> {e.name}</div>
+              <span>+</span>
+            </div>
+          ))}
+          {q.trim() && !exactMatch && (
+            <button className="btn primary mt-2" onClick={() => onCreate(q, withTargets({}))}>
+              + Create "{q.trim()}" and add
+            </button>
           )}
         </div>
         <button className="btn ghost mt-1" onClick={onClose}>Cancel</button>

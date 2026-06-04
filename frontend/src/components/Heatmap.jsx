@@ -2,23 +2,31 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
 
-// Fetch the past 53 weeks of sessions and render them as a GitHub-style
-// contribution heatmap. Each cell tinted by template color, opacity by count.
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// GitHub-style yearly heatmap. The user picks a calendar year via the
+// dropdown; the grid then shows that entire year's workout density.
+// Months are visually separated with a thin vertical line so each block
+// reads as its own chunk rather than one long ribbon of weeks.
 export default function Heatmap() {
   const [byDate, setByDate] = useState({});
+  const [year, setYear] = useState(new Date().getFullYear());
   const nav = useNavigate();
   const today = new Date();
 
+  // Provide a sensible window of years to pick from: a few back, current,
+  // and one forward (so a December workout planning ahead still works).
+  const thisYear = today.getFullYear();
+  const years = [];
+  for (let y = thisYear + 1; y >= thisYear - 4; y--) years.push(y);
+
   useEffect(() => {
-    // Pull the last 12 months by calling the monthly endpoint for each month.
     (async () => {
       const map = {};
       const promises = [];
-      for (let i = 0; i < 13; i++) {
-        const dt = new Date(today.getFullYear(), today.getMonth() - i, 1);
-        const y = dt.getFullYear(); const m = dt.getMonth() + 1;
+      for (let m = 1; m <= 12; m++) {
         promises.push(
-          api.get(`/sessions/calendar/${y}/${m}`).then((rows) => {
+          api.get(`/sessions/calendar/${year}/${m}`).then((rows) => {
             for (const r of rows) {
               const k = r.session_date.slice(0, 10);
               if (!map[k]) map[k] = [];
@@ -30,44 +38,48 @@ export default function Heatmap() {
       await Promise.all(promises);
       setByDate(map);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [year]);
 
-  // Build 53 weeks ending on the current week.
-  // Each column = 1 week, 7 rows (Mon..Sun).
-  const totalDays = 53 * 7;
-  const end = new Date(today);
-  // align so that the last column ends on Sunday of the current week
-  const dow = (end.getDay() + 6) % 7; // Mon=0
-  const daysToSundayEnd = 6 - dow;
-  end.setDate(end.getDate() + daysToSundayEnd);
-  const days = [];
-  for (let i = totalDays - 1; i >= 0; i--) {
-    const d = new Date(end);
-    d.setDate(end.getDate() - i);
-    const tz = d.getTimezoneOffset() * 60000;
-    const iso = new Date(d - tz).toISOString().slice(0, 10);
-    days.push({ iso, date: d });
-  }
+  // Build the year as columns of weeks. Each column = 7 cells (Mon..Sun).
+  // We start from the Monday on/before Jan 1 of the selected year and walk
+  // forward week-by-week through Dec 31. Leading and trailing cells that
+  // fall outside the year are rendered blank.
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd   = new Date(year, 11, 31);
+  // back up to the Monday on/before Jan 1
+  const startOffsetMon = (yearStart.getDay() + 6) % 7;
+  const gridStart = new Date(yearStart);
+  gridStart.setDate(yearStart.getDate() - startOffsetMon);
 
-  // Group into 7-rows x 53-cols
   const cols = [];
-  for (let c = 0; c < 53; c++) {
-    cols.push(days.slice(c * 7, c * 7 + 7));
+  const cur = new Date(gridStart);
+  while (cur <= yearEnd || ((cur.getDay() + 6) % 7) !== 0) {
+    const col = [];
+    for (let r = 0; r < 7; r++) {
+      const d = new Date(cur);
+      const tz = d.getTimezoneOffset() * 60000;
+      const iso = new Date(d - tz).toISOString().slice(0, 10);
+      const inYear = d.getFullYear() === year;
+      col.push({ iso, date: new Date(d), inYear });
+      cur.setDate(cur.getDate() + 1);
+    }
+    cols.push(col);
+    // safety stop — a year is at most 54 weeks
+    if (cols.length > 54) break;
   }
 
-  // For each column, decide if a month label should appear above it.
-  // A label appears at the FIRST column whose first day's month differs
-  // from the previous column's month. That way each month appears once,
-  // anchored at its starting week.
-  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Month label appears at the first column whose first in-year day's
+  // month differs from the previous column's first in-year day's month.
+  // We also flag those columns so CSS can paint a separator line.
   const monthLabels = cols.map((col, ci) => {
-    if (!col || col.length === 0) return '';
-    const m = col[0].date.getMonth();
-    const prev = ci > 0 && cols[ci - 1].length > 0
-      ? cols[ci - 1][0].date.getMonth()
-      : -1;
-    return m !== prev ? MONTHS[m] : '';
+    const dayInYear = col.find((d) => d.inYear);
+    if (!dayInYear) return { label: '', isStart: false };
+    const m = dayInYear.date.getMonth();
+    const prevCol = ci > 0 ? cols[ci - 1] : null;
+    const prevDay = prevCol ? prevCol.find((d) => d.inYear) : null;
+    const prevM = prevDay ? prevDay.date.getMonth() : -1;
+    const isStart = m !== prevM;
+    return { label: isStart ? MONTHS[m] : '', isStart };
   });
 
   function dayStyle(list) {
@@ -84,15 +96,31 @@ export default function Heatmap() {
 
   return (
     <div className="heatmap">
+      <div className="heatmap-toolbar">
+        <select
+          className="heatmap-year"
+          value={year}
+          onChange={(e) => setYear(+e.target.value)}
+          aria-label="Year"
+        >
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
       <div className="heatmap-months">
         {monthLabels.map((m, ci) => (
-          <div key={ci} className="heatmap-month">{m}</div>
+          <div key={ci} className="heatmap-month">{m.label}</div>
         ))}
       </div>
       <div className="heatmap-grid">
         {cols.map((col, ci) => (
-          <div className="heatmap-col" key={ci}>
+          <div
+            className={`heatmap-col${monthLabels[ci].isStart && ci > 0 ? ' month-start' : ''}`}
+            key={ci}
+          >
             {col.map((d, ri) => {
+              if (!d.inYear) {
+                return <div key={ri} className="heatmap-cell outside" />;
+              }
               const list = byDate[d.iso] || [];
               const isFuture = d.date > today;
               return (

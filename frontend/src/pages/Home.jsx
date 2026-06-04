@@ -38,6 +38,7 @@ export default function Home() {
     <div className="app-shell page-home">
       <TopBar
         brand
+        brandSuffix={user?.username}
         right={
           <div style={{ display: 'flex', gap: 4 }}>
             <Link className="right-action mobile-only" to="/settings" title="Settings">⚙</Link>
@@ -52,11 +53,8 @@ export default function Home() {
         }
       />
       <div className="content">
-        {/* Mobile welcome bar */}
+        {/* Mobile CTA — username already lives in the brand on the topbar */}
         <div className="welcome-bar mobile-only">
-          <div className="welcome-bar__name">
-            <span className="welcome-bar__user">{user?.username}</span>
-          </div>
           <Link to="/log" className="btn primary welcome-bar__cta">+ Log a workout</Link>
         </div>
 

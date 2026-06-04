@@ -168,6 +168,20 @@ addCol('session_exercises',  'alt_exercise_id', 'INTEGER REFERENCES exercises(id
 addCol('session_exercises',  'alt_active',      'INTEGER NOT NULL DEFAULT 0');
 addCol('template_exercises', 'alt_exercise_id', 'INTEGER REFERENCES exercises(id)');
 
+// A and B keep their own notes and ▲/▼ adjust hint independently.
+addCol('session_exercises', 'alt_exercise_notes', 'TEXT');
+addCol('session_exercises', 'alt_weight_adjust',  'TEXT');
+
+// Each set belongs to either the A side (default 0) or the B side (1).
+// The UI filters set rows by the currently active side so toggling A↔B
+// shows that side's own kg / reps / time / mileage entries.
+addCol('session_sets', 'alt_active', 'INTEGER NOT NULL DEFAULT 0');
+
+// Templates can pre-pair exercises into supersets (A, B, ...) so a new
+// session inherits the grouping automatically.
+addCol('template_exercises', 'superset_tag', "TEXT DEFAULT ''");
+addCol('template_exercises', 'rest_seconds', 'INTEGER');
+
 // Per-session UI mode: 'expandable' (collapsed accordion) | 'fixed' (always open)
 addCol('workout_sessions', 'expand_mode', "TEXT NOT NULL DEFAULT 'expandable'");
 

@@ -64,8 +64,9 @@ router.post('/', (req, res) => {
   const insertEx = db.prepare(
     `INSERT INTO template_exercises
        (template_id, exercise_id, order_idx, target_sets, target_reps,
-        target_time_s, target_mileage_m, alt_exercise_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        target_time_s, target_mileage_m, alt_exercise_id,
+        superset_tag, rest_seconds)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const txn = db.transaction(() => {
     const info = insertTmpl.run(req.userId, name.trim(), finalColor);
@@ -74,7 +75,8 @@ router.post('/', (req, res) => {
         info.lastInsertRowid, ex.exercise_id, idx,
         ex.target_sets || 3, ex.target_reps || '',
         ex.target_time_s || null, ex.target_mileage_m || null,
-        ex.alt_exercise_id || null
+        ex.alt_exercise_id || null,
+        ex.superset_tag || '', ex.rest_seconds || null
       );
     });
     return info.lastInsertRowid;
@@ -96,15 +98,17 @@ router.put('/:id', (req, res) => {
       const stmt = db.prepare(
         `INSERT INTO template_exercises
            (template_id, exercise_id, order_idx, target_sets, target_reps,
-            target_time_s, target_mileage_m, alt_exercise_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+            target_time_s, target_mileage_m, alt_exercise_id,
+            superset_tag, rest_seconds)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
       exercises.forEach((ex, idx) => {
         stmt.run(
           id, ex.exercise_id, idx,
           ex.target_sets || 3, ex.target_reps || '',
           ex.target_time_s || null, ex.target_mileage_m || null,
-          ex.alt_exercise_id || null
+          ex.alt_exercise_id || null,
+          ex.superset_tag || '', ex.rest_seconds || null
         );
       });
     }
