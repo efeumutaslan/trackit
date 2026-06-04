@@ -40,24 +40,18 @@ export default function Home() {
         brand
         brandSuffix={user?.username}
         right={
-          <div style={{ display: 'flex', gap: 4 }}>
-            <Link className="right-action mobile-only" to="/settings" title="Settings">⚙</Link>
-            <button
-              className="right-action mobile-only"
-              onClick={() => { logout(); nav('/login'); }}
-              title="Sign out"
-            >
-              Sign out
-            </button>
-          </div>
+          // Sign out only on desktop now — the cog moved to the bottom nav
+          // on mobile, and we don't want a duplicate sign-out either.
+          <button
+            className="right-action desktop-only"
+            onClick={() => { logout(); nav('/login'); }}
+            title="Sign out"
+          >
+            Sign out
+          </button>
         }
       />
       <div className="content">
-        {/* Mobile CTA — username already lives in the brand on the topbar */}
-        <div className="welcome-bar mobile-only">
-          <Link to="/log" className="btn primary welcome-bar__cta">+ Log a workout</Link>
-        </div>
-
         {/* Desktop hero: greeting + stat cards + CTA */}
         <div className="desktop-hero desktop-only">
           <div className="desktop-hero__head">

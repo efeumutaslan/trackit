@@ -136,15 +136,29 @@ export default function Session() {
     nav('/sessions');
   }
 
+  // Compute the rest timer's remaining seconds & matching colour band.
+  // The colour drives a class on the topbar so the entire banner flashes
+  // green / amber / red depending on how much time is left.
+  const restRemainingSec = restEnd
+    ? Math.max(0, Math.ceil((restEnd - Date.now()) / 1000))
+    : 0;
+  let restClass = '';
+  if (restEnd) {
+    if (restRemainingSec <= 10)      restClass = 'topbar--rest-red';
+    else if (restRemainingSec <= 30) restClass = 'topbar--rest-amber';
+    else                             restClass = 'topbar--rest-green';
+  }
+
   return (
     <div className="app-shell page-session">
       <TopBar
         back
+        className={restClass}
         title={
           restEnd
             // Replace the template name with a live countdown while the
             // rest timer is running. ⏱ + remaining seconds.
-            ? `⏱ Rest: ${Math.max(0, Math.ceil((restEnd - Date.now()) / 1000))}s`
+            ? `⏱ Rest: ${restRemainingSec}s`
             : (s.template_name || 'Session')
         }
         right={
@@ -344,6 +358,15 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
   const [restSecs, setRestSecs] = useState(ex.rest_seconds ?? '');
   const [showReplace, setShowReplace] = useState(false);
   const [showTargets, setShowTargets] = useState(false);
+  // When the active side flips (A↔B) the parent reloads and sends a new
+  // ex prop with the active side's notes / adjust. The local state was
+  // initialised only on mount, so it would otherwise still show the
+  // previous side's note. Re-sync every time alt_active changes.
+  useEffect(() => {
+    setNotes(ex.exercise_notes || '');
+    setAdjust(ex.weight_adjust || '');
+  }, [ex.alt_active, ex.exercise_notes, ex.weight_adjust]);
+
   // Accordion: in 'expandable' mode the card starts collapsed and only
   // shows the head. In 'fixed' mode it's always open. Per-card local state
   // so the user can open/close individually within an expandable session.
@@ -838,7 +861,7 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, repPlace
         <div className="set-num">{set.set_number}</div>
         {showCols?.kg && (
           <div className="set-kg-wrap">
-            <button className="kg-bump" onClick={() => bumpKg(2.5)} title="+2.5 kg">+</button>
+            <button className="kg-bump" onClick={() => bumpKg(-2.5)} title="-2.5 kg">−</button>
             <input
               type="text"
               inputMode="decimal"
@@ -848,7 +871,7 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, repPlace
               onBlur={saveKg}
               placeholder="-"
             />
-            <button className="kg-bump" onClick={() => bumpKg(-2.5)} title="-2.5 kg">−</button>
+            <button className="kg-bump" onClick={() => bumpKg(2.5)} title="+2.5 kg">+</button>
           </div>
         )}
         {showCols?.rep && (

@@ -69,7 +69,9 @@ a { color: inherit; text-decoration: none; }
   margin: 0 auto;
   background: var(--cream);
   position: relative;
-  padding-bottom: 78px;
+  /* Leaves room for the bottomnav + the floating + FAB that protrudes
+     above it. ~64px bar height + 18px FAB lift + buffer. */
+  padding-bottom: 90px;
 }
 
 .topbar {
@@ -110,6 +112,11 @@ a { color: inherit; text-decoration: none; }
 .content { padding: 0 18px 24px; }
 
 /* Bottom nav */
+/* ───── Bottom navigation (mobile) ─────────────────────────────────
+   7 slots: Home, Sessions, Templates, [ + FAB ], Exercises, Body,
+   Settings. The FAB is a circular peach button that sits in the
+   middle and floats ~30% above the bar so the + visually pops out
+   instead of sitting flush. Bar height is tightened. */
 .bottomnav {
   position: fixed;
   bottom: 0;
@@ -121,22 +128,74 @@ a { color: inherit; text-decoration: none; }
   border-top: 1px solid var(--gray-bg);
   display: flex;
   justify-content: space-around;
-  padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+  align-items: stretch;
+  padding: 4px 0 calc(4px + env(safe-area-inset-bottom));
   z-index: 9;
 }
-.bottomnav a {
+/* Regular nav items: icon over a tiny label, tightened padding. */
+.bn-item {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 6px;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px 2px;
   color: var(--gray);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
+  text-decoration: none;
+  min-width: 0;
 }
-.bottomnav a.active { color: var(--peach-dark); }
-.bottomnav a .icon { font-size: 22px; }
+.bn-item.active { color: var(--peach-dark); }
+.bn-item .icon { font-size: 20px; line-height: 1; }
+.bn-item .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+/* Floating + FAB — the primary CTA replaces the old in-page button.
+   Sits between Templates and Exercises and lifts itself ~30% of the
+   bar's own height upward via a negative top margin. */
+.bn-fab {
+  flex: 0 0 auto;
+  /* The visible circle */
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--peach);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Lift it ~30% above the bar. The bar is roughly 60px tall on mobile
+     after our padding tightening, so 18px gives a clear protrusion
+     while still keeping the bottom edge tucked into the bar. */
+  margin-top: -18px;
+  margin-bottom: 4px;
+  margin-left: 6px;
+  margin-right: 6px;
+  box-shadow: 0 6px 16px rgba(255, 176, 122, 0.55);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s, box-shadow 0.15s, background 0.15s;
+  /* Keep the FAB above the bar's own background */
+  z-index: 1;
+}
+.bn-fab:active {
+  transform: translateY(1px) scale(0.96);
+  background: var(--peach-dark);
+}
+.bn-fab__plus {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  /* Pull the plus glyph up slightly so it's optically centred — the
+     '+' character renders below the baseline midline by default. */
+  margin-top: -2px;
+}
+.bn-fab.active { background: var(--peach-dark); }
 
 /* Cards */
 .card {
@@ -1567,16 +1626,29 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   gap: 6px;
   line-height: 1.25;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+/* The actual name text — direct child <span> after the optional
+   superset badge. Limit to one line with ellipsis instead of wrapping
+   onto a second line, otherwise long names like "Incline DB Press" or
+   "Bench Press" push the action buttons down. */
+.exercise-head__name > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+.exercise-head__actions .btn.tiny {
+  padding: 4px 6px;
+  min-width: 26px;
+  font-size: 13px;
 }
 .exercise-head__actions {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
-}
-.exercise-head__actions .btn.tiny {
-  padding: 4px 8px;
-  min-width: 28px;
-  font-size: 14px;
 }
 .exercise-head__bottom {
   display: flex;
@@ -1638,4 +1710,37 @@ a { color: inherit; text-decoration: none; }
 .topbar .brand-suffix {
   color: var(--ink);
   font-weight: 700;
+}
+
+/* ───── Rest timer banner colours ─────────────────────────────────
+   The topbar background switches based on how much rest is left:
+   • >30s : green
+   • 11-30s : amber
+   • ≤10s : red
+   The h1 text and back button get a contrasting colour so the banner
+   stays readable at all three. */
+.topbar.topbar--rest-green,
+.topbar.topbar--rest-amber,
+.topbar.topbar--rest-red {
+  transition: background-color 0.3s ease;
+}
+.topbar.topbar--rest-green  { background: #4CAF50; }
+.topbar.topbar--rest-amber  { background: #FFC107; }
+.topbar.topbar--rest-red    { background: #F44336; }
+.topbar.topbar--rest-green h1,
+.topbar.topbar--rest-red h1   { color: var(--white); }
+.topbar.topbar--rest-amber h1 { color: #1a1a1a; }
+.topbar.topbar--rest-green .back,
+.topbar.topbar--rest-red .back   { color: var(--white); background: rgba(255,255,255,0.18); }
+.topbar.topbar--rest-amber .back { color: #1a1a1a; }
+.topbar.topbar--rest-green .right-action,
+.topbar.topbar--rest-red .right-action { color: var(--white) !important; }
+.topbar.topbar--rest-amber .right-action { color: #1a1a1a !important; }
+/* Pulse the red banner so the last 10s also "feels" urgent. */
+.topbar.topbar--rest-red {
+  animation: rest-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes rest-pulse {
+  from { background-color: #F44336; }
+  to   { background-color: #C62828; }
 }
