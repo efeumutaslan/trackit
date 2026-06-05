@@ -905,7 +905,6 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime
             <TimeDropdown
               value={set.time_seconds}
               prev={prevTime}
-              hasTarget={!!targets?.target_time_s}
               onCommit={async (sec) => {
                 await api.put(`/sessions/${sessionId}/sets/${set.id}`, { time_seconds: sec });
                 if (onSaved) await onSaved({ kind: 'time' });
@@ -916,7 +915,7 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime
             <input
               type="text"
               inputMode="numeric"
-              className={`mileage-input${targets?.target_mileage_m ? ' has-target' : ''}`}
+              className="mileage-input"
               value={mStr}
               onFocus={selectAll}
               onChange={(e) => setMStr(e.target.value.replace(/[^0-9]/g, ''))}
@@ -936,7 +935,7 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime
 // raw HH:MM:SS string. If `prev` is provided (previous session's time),
 // the dropdowns start at that value as a placeholder cue — but we render
 // it as a small inline hint above so the user can see the prior value.
-function TimeDropdown({ value, prev, hasTarget, onCommit }) {
+function TimeDropdown({ value, prev, onCommit }) {
   const init = (sec) => {
     const s = sec ?? 0;
     return {
@@ -973,7 +972,7 @@ function TimeDropdown({ value, prev, hasTarget, onCommit }) {
   })();
 
   return (
-    <div className={`time-dropdown${hasTarget ? ' has-target' : ''}${value == null ? ' is-empty' : ''}`}>
+    <div className="time-dropdown">
       <select value={hms.h} onChange={(e) => set('h', e.target.value)} aria-label="Hours">
         {opts(23)}
       </select>

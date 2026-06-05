@@ -17,16 +17,45 @@ function getPrevWorkoutNotes(userId, templateId, beforeDate) {
   return row?.workout_notes || '';
 }
 
-function getPrevExerciseNotes(userId, exerciseId, beforeDate) {
+// Find the most recent non-empty exercise note for an exercise.
+// Walks every prior SE for this exercise (regardless of whether it was
+// the primary or the alt at the time) and returns the first non-empty
+// note found — checking both exercise_notes (A side) and
+// alt_exercise_notes (B side) so a note typed under either role is
+// recovered. weight_adjust uses the same logic.
+function getPrevExerciseNotesAndAdjust(userId, exerciseId, beforeDate, excludeSessionId) {
+  const exclude = excludeSessionId || -1;
+  // Get latest SE where this exercise appears, in either role, with content.
   const row = db.prepare(`
-    SELECT se.exercise_notes FROM session_exercises se
+    SELECT
+      se.exercise_id, se.alt_exercise_id,
+      se.exercise_notes, se.weight_adjust,
+      se.alt_exercise_notes, se.alt_weight_adjust
+    FROM session_exercises se
     JOIN workout_sessions ws ON ws.id = se.session_id
-    WHERE ws.user_id = ? AND se.exercise_id = ?
-      AND ws.session_date <= ?
-      AND COALESCE(se.exercise_notes,'') != ''
+    WHERE ws.user_id = ?
+      AND ws.session_date <= ? AND ws.id != ?
+      AND (
+        (se.exercise_id = ? AND (COALESCE(se.exercise_notes,'') != '' OR COALESCE(se.weight_adjust,'') != ''))
+        OR
+        (se.alt_exercise_id = ? AND (COALESCE(se.alt_exercise_notes,'') != '' OR COALESCE(se.alt_weight_adjust,'') != ''))
+      )
     ORDER BY ws.session_date DESC, ws.created_at DESC, ws.id DESC LIMIT 1
-  `).get(userId, exerciseId, beforeDate);
-  return row?.exercise_notes || '';
+  `).get(userId, beforeDate, exclude, exerciseId, exerciseId);
+  if (!row) return { notes: '', adjust: '' };
+  // Pull the side that matches the requested exercise.
+  if (row.exercise_id === exerciseId) {
+    return { notes: row.exercise_notes || '', adjust: row.weight_adjust || '' };
+  }
+  return { notes: row.alt_exercise_notes || '', adjust: row.alt_weight_adjust || '' };
+}
+
+function getPrevExerciseNotes(userId, exerciseId, beforeDate) {
+  // Backward-compatible wrapper kept for the session POST + add-exercise
+  // paths that only want the note string. They aren't side-aware yet —
+  // we treat exercise_id as the primary lookup but still scan both
+  // columns for the most-recent non-empty value.
+  return getPrevExerciseNotesAndAdjust(userId, exerciseId, beforeDate, null).notes;
 }
 
 // Returns an ordered list of weight_kg values from the most recent prior
@@ -522,18 +551,58 @@ router.put('/:id/exercises/:seId', (req, res) => {
   );
 
   // If we just flipped to a side that has no sets yet, lazily create
-  // target_sets empty rows for that side so the UI has something to
-  // render. This is the moment a user first toggles A→B.
+  // target_sets rows for that side. We also pre-fill kg / time / mileage
+  // AND the exercise note + adjust hint from the most recent prior
+  // session of THAT side's exercise. So toggling A→B brings up the B
+  // exercise's own history rather than a totally blank slate.
   if (alt_active !== undefined) {
     const existing = db.prepare(
       'SELECT COUNT(*) AS n FROM session_sets WHERE session_exercise_id = ? AND alt_active = ?'
     ).get(seId, newAltActive).n;
     if (existing === 0) {
       const targetN = se.target_sets || 3;
+      const sideExerciseId = newAltActive === 1 ? se.alt_exercise_id : se.exercise_id;
+      let prevWeights = [], prevTimes = [], prevMileages = [];
+      let prevNote = '', prevAdjust = '';
+      if (sideExerciseId) {
+        const wsRow = db.prepare('SELECT template_id, session_date FROM workout_sessions WHERE id = ?').get(id);
+        prevWeights  = getPrevSetWeights (req.userId, sideExerciseId, wsRow.template_id || null, wsRow.session_date, id);
+        prevTimes    = getPrevSetTimes   (req.userId, sideExerciseId, wsRow.template_id || null, wsRow.session_date, id);
+        prevMileages = getPrevSetMileages(req.userId, sideExerciseId, wsRow.template_id || null, wsRow.session_date, id);
+        const noteAdj = getPrevExerciseNotesAndAdjust(req.userId, sideExerciseId, wsRow.session_date, id);
+        prevNote   = noteAdj.notes;
+        prevAdjust = noteAdj.adjust;
+      }
       const ins = db.prepare(
-        'INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, alt_active) VALUES (?, ?, NULL, ?)'
+        'INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, time_seconds, mileage_m, alt_active) VALUES (?, ?, ?, ?, ?, ?)'
       );
-      for (let i = 1; i <= targetN; i++) ins.run(seId, i, newAltActive);
+      for (let i = 1; i <= targetN; i++) {
+        const w = prevWeights [i - 1] != null ? prevWeights [i - 1] : null;
+        const t = prevTimes   [i - 1] != null ? prevTimes   [i - 1] : null;
+        const m = prevMileages[i - 1] != null ? prevMileages[i - 1] : null;
+        ins.run(seId, i, w, t, m, newAltActive);
+      }
+      // Also pre-fill the side's note + adjust columns if they are still
+      // blank. Only write into the side we just activated.
+      if (prevNote || prevAdjust) {
+        if (newAltActive === 1) {
+          // B side — fill alt_exercise_notes / alt_weight_adjust if empty
+          db.prepare(`
+            UPDATE session_exercises
+            SET alt_exercise_notes = COALESCE(NULLIF(alt_exercise_notes,''), ?),
+                alt_weight_adjust  = COALESCE(NULLIF(alt_weight_adjust,''),  ?)
+            WHERE id = ?
+          `).run(prevNote || null, prevAdjust || null, seId);
+        } else {
+          // A side
+          db.prepare(`
+            UPDATE session_exercises
+            SET exercise_notes = COALESCE(NULLIF(exercise_notes,''), ?),
+                weight_adjust  = COALESCE(NULLIF(weight_adjust,''),  ?)
+            WHERE id = ?
+          `).run(prevNote || null, prevAdjust || null, seId);
+        }
+      }
     }
   }
 
