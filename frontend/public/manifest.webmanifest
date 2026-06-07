@@ -4,8 +4,8 @@
   "description": "Workout tracker that helps you see your progress",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FAF6F2",
-  "theme_color": "#FFB07A",
+  "background_color": "#0A0A0A",
+  "theme_color": "#0A0A0A",
   "orientation": "portrait",
   "icons": [
     {

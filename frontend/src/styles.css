@@ -1,23 +1,39 @@
+/* ────────────────────────────────────────────────────────────────────
+   THEME — CycleGo dark.
+   Black canvas, neon yellow-green accent. Variable NAMES are kept the
+   same (--peach, --cream, --ink, …) so the rest of the codebase doesn't
+   have to change a single class; only the values were re-mapped.
+   ──────────────────────────────────────────────────────────────────── */
 :root {
-  --peach: #FFB07A;
-  --peach-dark: #F39264;
-  --peach-soft: #FFE8D6;
-  --peach-bg: #FFF5EE;
-  --cream: #FAF6F2;
-  --ink: #2C2C2E;
-  --ink-soft: #5A5A60;
-  --gray: #9A9AA0;
-  --gray-soft: #D6D6DA;
-  --gray-bg: #F2F2F4;
-  --white: #FFFFFF;
-  --green: #6FCBA4;
-  --red: #FF7A7A;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 14px rgba(0,0,0,0.08);
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
+  /* Accent — the neon yellow-green that powers every active state */
+  --peach: #D3FF56;
+  --peach-dark: #B8E63D;
+  --peach-soft: rgba(211, 255, 86, 0.18);  /* translucent green tint */
+  --peach-bg: #1E2412;                      /* faint green-tinted block bg */
+
+  /* Surfaces */
+  --cream: #0A0A0A;     /* page background, the deep base */
+  --white: #1B1C19;     /* cards, the elevated dark surface */
+
+  /* Type */
+  --ink: #F6F8F1;       /* primary text — soft white */
+  --ink-soft: #B8B9B5;  /* secondary text */
+  --gray: #7A7B77;      /* muted */
+  --gray-soft: #3F403D; /* borders, dividers */
+  --gray-bg: #1E1F1C;   /* subtle inset background */
+
+  /* Status */
+  --green: #D3FF56;     /* success uses the same accent */
+  --red:   #FF6B6B;     /* destructive */
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.5);
+  --shadow-glow: 0 0 24px rgba(211, 255, 86, 0.18);
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
 }
 
 * { box-sizing: border-box; }
@@ -26,7 +42,7 @@ html, body, #root {
   margin: 0; padding: 0;
   height: 100%;
   background: var(--cream);
-  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: 'Urbanist', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
 }
@@ -165,7 +181,7 @@ a { color: inherit; text-decoration: none; }
   height: 56px;
   border-radius: 50%;
   background: var(--peach);
-  color: var(--white);
+  color: #0A0A0A;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -250,8 +266,9 @@ a { color: inherit; text-decoration: none; }
 
 .btn.primary {
   background: var(--peach);
-  color: var(--white);
-  box-shadow: 0 4px 12px rgba(255,176,122,0.4);
+  color: #0A0A0A;
+  box-shadow: 0 4px 12px rgba(211, 255, 86, 0.25);
+  font-weight: 700;
 }
 .btn.primary:hover { background: var(--peach-dark); }
 .btn.ghost {
@@ -399,7 +416,7 @@ a { color: inherit; text-decoration: none; }
   overflow: hidden;
 }
 .calendar-grid .day.today { outline: 2px solid var(--peach); outline-offset: -2px; }
-.calendar-grid .day.has-session { color: var(--white); }
+.calendar-grid .day.has-session { color: #0A0A0A; font-weight: 700; }
 .calendar-grid .day.empty { background: transparent; }
 .calendar-grid .day .day-num { position: relative; z-index: 1; }
 .calendar-grid .day .day-count {
@@ -523,8 +540,8 @@ a { color: inherit; text-decoration: none; }
 }
 
 .error-box {
-  background: rgba(255,122,122,0.12);
-  color: #C24A4A;
+  background: rgba(255,107,107,0.12);
+  color: var(--red);
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   font-size: 13px;
@@ -758,22 +775,28 @@ a { color: inherit; text-decoration: none; }
   justify-content: center;
 }
 .adjust-btn.adjust-up {
-  background: #DDF5E5;
-  color: #2E8B57;
+  /* Soft green tint when resting, lights up to the brand neon-green
+     when "pressed" (= the user picked this adjust). */
+  background: rgba(211, 255, 86, 0.12);
+  color: var(--peach);
+  border-color: rgba(211, 255, 86, 0.3);
 }
 .adjust-btn.adjust-down {
-  background: #FCE0E0;
-  color: #B33A3A;
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--red);
+  border-color: rgba(255, 107, 107, 0.3);
 }
 .adjust-btn.adjust-up.pressed {
-  background: #7FCD9A;
-  color: #1F5A38;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);
+  background: var(--peach);
+  color: #0A0A0A;
+  border-color: var(--peach);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
 }
 .adjust-btn.adjust-down.pressed {
-  background: #E88787;
-  color: #6E1F1F;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);
+  background: var(--red);
+  color: #0A0A0A;
+  border-color: var(--red);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
 }
 .adjust-btn:active { transform: scale(0.96); }
 
@@ -784,12 +807,12 @@ a { color: inherit; text-decoration: none; }
    was invisible against the cream background, so we use a stronger
    tint plus a 4px coloured left stripe. */
 .exercise-block.exercise-block--prev-up {
-  background: #DBF3E4;
-  border-left: 4px solid #4DAA75;
+  background: rgba(211, 255, 86, 0.06);
+  border-left: 4px solid var(--peach);
 }
 .exercise-block.exercise-block--prev-down {
-  background: #FBDDDD;
-  border-left: 4px solid #D86161;
+  background: rgba(255, 107, 107, 0.06);
+  border-left: 4px solid var(--red);
 }
 /* Previous-note card inside a tinted exercise stays white so it's still readable */
 .exercise-block.exercise-block--prev-up .prev-note-card,
@@ -862,16 +885,19 @@ a { color: inherit; text-decoration: none; }
   transform: scale(0.94);
 }
 
-/* Highlight inputs whose value has a target on the SE */
+/* Highlight inputs whose value has a target on the SE. In dark theme
+   this is a subtle green-tinted dark background — the green border
+   does the heavy lifting, the fill just nudges. */
 .set-row input.has-target {
   border-color: var(--peach);
-  background: #FFF8F0;
+  background: var(--peach-bg);
 }
 
-/* Superset badge in exercise head */
+/* Superset badge in exercise head — same accent treatment as the rest
+   of the app, with dark text so it pops on the bright green pill. */
 .superset-badge {
   background: var(--peach);
-  color: var(--white);
+  color: #0A0A0A;
   font-size: 11px;
   font-weight: 700;
   padding: 2px 6px;
@@ -1104,7 +1130,7 @@ a { color: inherit; text-decoration: none; }
 }
 .alt-toggle__btn.on {
   background: var(--peach);
-  color: var(--white);
+  color: #0A0A0A;
 }
 
 /* ─── Alt-exercise inline picker inside the ⚙ targets panel ───── */
@@ -1258,7 +1284,7 @@ a { color: inherit; text-decoration: none; }
     width: 32px; height: 32px;
     border-radius: 50%;
     background: var(--peach);
-    color: var(--white);
+    color: #0A0A0A;
     display: flex; align-items: center; justify-content: center;
     font-weight: 700;
   }
@@ -1821,7 +1847,7 @@ a { color: inherit; text-decoration: none; }
   transition: background 0.12s, transform 0.08s;
   -webkit-tap-highlight-color: transparent;
 }
-.heatmap-month--clickable:hover  { background: var(--peach); color: var(--white); }
+.heatmap-month--clickable:hover  { background: var(--peach); color: #0A0A0A; }
 .heatmap-month--clickable:active { transform: translateY(1px) scale(0.96); }
 
 /* ════════════════════════════════════════════════════════════════════
