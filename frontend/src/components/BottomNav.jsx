@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom';
 import Icon from './Icon.jsx';
 
-// Bottom nav (mobile only):
-//   Home  Sessions  Templates  [ + FAB ]  Exercises  Body  Settings
+// Bottom nav (mobile only). Templates and Exercises moved into the
+// Settings page so the bar can breathe. Layout:
+//   Home  Sessions  [ + FAB ]  Body  Settings
 export default function BottomNav() {
   return (
     <nav className="bottomnav">
@@ -14,19 +15,11 @@ export default function BottomNav() {
         <span className="icon"><Icon name="clipboard" /></span>
         <span className="label">Sessions</span>
       </NavLink>
-      <NavLink to="/templates" className="bn-item">
-        <span className="icon"><Icon name="ruler" /></span>
-        <span className="label">Templates</span>
-      </NavLink>
 
       <NavLink to="/log" className="bn-fab" aria-label="Log a workout">
         <span className="bn-fab__plus"><Icon name="plus" /></span>
       </NavLink>
 
-      <NavLink to="/exercises" className="bn-item">
-        <span className="icon"><Icon name="dumbbell" /></span>
-        <span className="label">Exercises</span>
-      </NavLink>
       <NavLink to="/bodyweight" className="bn-item">
         <span className="icon"><Icon name="scale" /></span>
         <span className="label">Body</span>

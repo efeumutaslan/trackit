@@ -1730,8 +1730,16 @@ a { color: inherit; text-decoration: none; }
 .topbar.topbar--rest-red .back   { color: var(--white); background: rgba(255,255,255,0.18); }
 .topbar.topbar--rest-amber .back { color: #1a1a1a; }
 .topbar.topbar--rest-green .right-action,
-.topbar.topbar--rest-red .right-action { color: var(--white) !important; }
-.topbar.topbar--rest-amber .right-action { color: #1a1a1a !important; }
+.topbar.topbar--rest-red .right-action {
+  color: var(--white) !important;
+  background: rgba(255,255,255,0.18) !important;
+  box-shadow: none !important;
+}
+.topbar.topbar--rest-amber .right-action {
+  color: #1a1a1a !important;
+  background: rgba(0,0,0,0.10) !important;
+  box-shadow: none !important;
+}
 /* Pulse the red banner so the last 10s also "feels" urgent. */
 .topbar.topbar--rest-red {
   animation: rest-pulse 0.8s ease-in-out infinite alternate;
@@ -1802,15 +1810,148 @@ a { color: inherit; text-decoration: none; }
    alone already reads as "press me". */
 .heatmap-month--clickable {
   cursor: pointer;
-  border-radius: 999px;
-  padding: 2px 8px;
+  border-radius: 8px;
+  padding: 3px 10px;
   margin: 0 -4px;
   background: var(--peach-soft);
   color: var(--peach-dark);
   border: 1px solid var(--peach);
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 12px;
   transition: background 0.12s, transform 0.08s;
   -webkit-tap-highlight-color: transparent;
 }
 .heatmap-month--clickable:hover  { background: var(--peach); color: var(--white); }
 .heatmap-month--clickable:active { transform: translateY(1px) scale(0.96); }
+
+/* ════════════════════════════════════════════════════════════════════
+   Time picker — wheel (mobile) + text (desktop / pencil toggle)
+   ════════════════════════════════════════════════════════════════════ */
+.time-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--white);
+  border: 1px solid var(--gray-soft);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+.time-picker--text .time-text-input {
+  width: 90px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  padding: 2px 0;
+}
+.time-mode-toggle {
+  background: transparent;
+  border: none;
+  color: var(--gray);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 11px;
+  line-height: 1;
+}
+.time-mode-toggle:active { color: var(--peach-dark); }
+.time-prev-hint {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  background: var(--gray-bg);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Wheel layout — three columns of scroll-snap items. The visible
+   window is 3 rows tall (108px @ 36px/row); the centre row is
+   highlighted. Spacer divs top and bottom let the first / last
+   numbers sit on the centre row at scroll extremes. */
+.time-picker--wheel {
+  padding: 2px 4px;
+  position: relative;
+}
+.time-wheel {
+  position: relative;
+  width: 42px;
+  flex-shrink: 0;
+}
+.time-wheel__list {
+  height: 108px;       /* 3 rows × 36 */
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  text-align: center;
+}
+.time-wheel__list::-webkit-scrollbar { display: none; }
+.time-wheel__spacer {
+  scroll-snap-align: none;
+}
+.time-wheel__item {
+  scroll-snap-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  transition: color 0.1s;
+}
+.time-wheel__item.is-selected {
+  color: var(--peach-dark);
+  font-size: 18px;
+}
+.time-wheel__centre {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  border-top: 1px solid var(--peach);
+  border-bottom: 1px solid var(--peach);
+  background: var(--peach-soft);
+  opacity: 0.35;
+}
+.time-wheel-sep {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray);
+}
+
+/* Settings page — Templates / Exercises rows that link out to the
+   library pages now that those tabs are no longer in the bottom nav. */
+.settings-link-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  text-decoration: none;
+  color: var(--ink);
+  border-bottom: 1px solid var(--gray-bg);
+  -webkit-tap-highlight-color: transparent;
+}
+.settings-link-row:last-child { border-bottom: none; }
+.settings-link-row__icon {
+  width: 24px;
+  text-align: center;
+  color: var(--peach-dark);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.settings-link-row__label {
+  flex: 1;
+  font-weight: 600;
+}
+.settings-link-row__chev {
+  color: var(--gray);
+}
+.settings-link-row:active { background: var(--gray-bg); }

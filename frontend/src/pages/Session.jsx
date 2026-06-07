@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
@@ -158,12 +158,19 @@ export default function Session() {
         title={
           restEnd
             // Replace the template name with a live countdown while the
-            // rest timer is running. ⏱ + remaining seconds.
+            // rest timer is running.
             ? `Rest: ${restRemainingSec}s`
             : (s.template_name || 'Session')
         }
         right={
-          <button className="right-action" onClick={delSession} style={{ color: 'var(--red)' }}>Delete</button>
+          restEnd
+            // While the timer is running, the only sensible right-side
+            // action is Skip. Delete would also be reachable but the
+            // timer banner is colour-coded and the user might mis-tap
+            // a red Delete on a red rest-banner background — Skip
+            // replaces Delete entirely.
+            ? <button className="right-action" onClick={cancelRest}>Skip</button>
+            : <button className="right-action" onClick={delSession} style={{ color: 'var(--red)' }}>Delete</button>
         }
       />
       <div className="content session-layout">
@@ -332,18 +339,9 @@ export default function Session() {
         )}
       </div>
 
-      {/* Rest timer overlay — appears when a set finishes and the SE has rest_seconds set */}
-      {restEnd && (
-        <div className="rest-timer">
-          <div className="rest-timer__bar" style={{
-            width: `${Math.max(0, Math.min(100, ((restEnd - Date.now()) / (restTotal * 1000)) * 100))}%`,
-          }} />
-          <div className="rest-timer__text">
-            <Icon name="stopwatch" /> Rest: {Math.max(0, Math.ceil((restEnd - Date.now()) / 1000))}s
-          </div>
-          <button className="rest-timer__skip" onClick={cancelRest}>Skip</button>
-        </div>
-      )}
+      {/* The bottom rest-timer overlay was removed — the countdown lives
+          on the topbar now (with colour banding green/amber/red) and the
+          Skip control sits in the topbar's right slot. */}
     </div>
   );
 }
@@ -651,6 +649,10 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
             repPlaceholderMode={settings?.rep_placeholder_mode || 'empty'}
             onSaved={async (evt) => {
               if (evt && evt.kind === 'kg') {
+                // Cascade the new kg value down to later empty sets,
+                // but DO NOT start the rest timer for a kg change.
+                // A weight tweak isn't a rep completion — the user is
+                // adjusting the load, not finishing a set.
                 const newW = evt.newW;
                 const prevW = set.weight_kg;
                 if (newW !== prevW) {
@@ -666,8 +668,9 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
                     );
                   }
                 }
-                if (onAfterRestSet && ex.rest_seconds) onAfterRestSet(ex.rest_seconds);
               }
+              // Only finishing a set (rep, time, or mileage commit)
+              // counts as "done" and starts the rest timer.
               if (evt && (evt.kind === 'rep' || evt.kind === 'time' || evt.kind === 'mileage')) {
                 if (onAfterRestSet && ex.rest_seconds) onAfterRestSet(ex.rest_seconds);
               }
@@ -902,7 +905,7 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime
         <div className="set-row set-row--time">
           <div className="set-num" style={{ visibility: 'hidden' }}>{set.set_number}</div>
           {showCols?.time ? (
-            <TimeDropdown
+            <TimePicker
               value={set.time_seconds}
               prev={prevTime}
               onCommit={async (sec) => {
@@ -930,12 +933,14 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime
   );
 }
 
-// Time input as three dropdowns (HH / MM / SS). Up to 23:59:59. Lets the
-// user pick a duration with thumb-friendly selects instead of typing a
-// raw HH:MM:SS string. If `prev` is provided (previous session's time),
-// the dropdowns start at that value as a placeholder cue — but we render
-// it as a small inline hint above so the user can see the prior value.
-function TimeDropdown({ value, prev, onCommit }) {
+// Time input. On mobile this is a 3-column wheel picker (iOS-style)
+// styled with CSS scroll-snap so it has the same tactile feel as the
+// alarm clock duration picker. The user scrolls each column, the row
+// in the centre is the selected value. There's also a text-input mode
+// (toggled by tapping the value) for power users / desktop. The
+// desktop screen size is wide enough that we just always render the
+// text input there, since wheels don't help with a keyboard + mouse.
+function TimePicker({ value, prev, onCommit }) {
   const init = (sec) => {
     const s = sec ?? 0;
     return {
@@ -945,46 +950,181 @@ function TimeDropdown({ value, prev, onCommit }) {
     };
   };
   const [hms, setHms] = useState(init(value));
+  // Two modes: 'wheel' (mobile default) and 'text' (toggle via the
+  // pencil button or always-on for desktop). The viewport check is
+  // matchMedia so it reacts to rotation.
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  const [mode, setMode] = useState(isDesktop ? 'text' : 'wheel');
+  // re-init local state whenever the upstream value changes (eg
+  // toggling A↔B side reloads).
   useEffect(() => { setHms(init(value)); }, [value]);
 
-  const set = (key, v) => {
-    const next = { ...hms, [key]: parseInt(v, 10) || 0 };
+  const commit = (next) => {
     setHms(next);
     onCommit(next.h * 3600 + next.m * 60 + next.s);
   };
 
-  const opts = (max) => {
-    const out = [];
-    for (let i = 0; i <= max; i++) out.push(<option key={i} value={i}>{String(i).padStart(2,'0')}</option>);
-    return out;
+  // Format the current value as HH:MM:SS for text mode and the prev hint
+  const fmt = (sec) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':');
   };
 
-  // Prior value rendered as a faint hint next to the dropdowns when the
-  // current set has no value of its own yet (so we don't shout it once
-  // they've started filling in).
-  const showPrev = (value == null) && (prev != null && prev > 0);
-  const prevFmt = (() => {
-    if (!showPrev) return null;
-    const h = Math.floor(prev / 3600);
-    const m = Math.floor((prev % 3600) / 60);
-    const s = prev % 60;
-    return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':');
-  })();
+  // Text-input mode parses a user-typed HH:MM:SS / MM:SS / SS
+  const [textVal, setTextVal] = useState(value != null ? fmt(value) : '');
+  useEffect(() => { setTextVal(value != null ? fmt(value) : ''); }, [value]);
+  const onTextBlur = () => {
+    const parts = textVal.split(':').map((p) => parseInt(p, 10) || 0);
+    while (parts.length < 3) parts.unshift(0);
+    const [h, m, s] = parts.slice(-3);
+    commit({ h, m, s });
+  };
+
+  // Prior pill — shown only when current value is null (empty set).
+  // Once the user picks anything the pill disappears so we don't keep
+  // shouting last week's number at them.
+  const showPrev = value == null && prev != null && prev > 0;
+
+  if (isDesktop || mode === 'text') {
+    return (
+      <div className="time-picker time-picker--text">
+        <input
+          type="text"
+          inputMode="numeric"
+          className="time-text-input"
+          value={textVal}
+          onChange={(e) => setTextVal(e.target.value.replace(/[^0-9:]/g, ''))}
+          onBlur={onTextBlur}
+          placeholder="HH:MM:SS"
+        />
+        {!isDesktop && (
+          <button
+            type="button"
+            className="time-mode-toggle"
+            onClick={() => setMode('wheel')}
+            aria-label="Switch to wheel picker"
+          >
+            <Icon name="caret-down" />
+          </button>
+        )}
+        {showPrev && <span className="time-prev-hint" title="Previous">{fmt(prev)}</span>}
+      </div>
+    );
+  }
+
+  // Mobile wheel mode
+  return (
+    <div className="time-picker time-picker--wheel">
+      <TimeWheel max={23} value={hms.h} onChange={(h) => commit({ ...hms, h })} label="hr" />
+      <span className="time-wheel-sep">:</span>
+      <TimeWheel max={59} value={hms.m} onChange={(m) => commit({ ...hms, m })} label="min" />
+      <span className="time-wheel-sep">:</span>
+      <TimeWheel max={59} value={hms.s} onChange={(s) => commit({ ...hms, s })} label="sec" />
+      <button
+        type="button"
+        className="time-mode-toggle"
+        onClick={() => setMode('text')}
+        aria-label="Switch to keyboard input"
+      >
+        <Icon name="edit" />
+      </button>
+      {showPrev && <span className="time-prev-hint" title="Previous">{fmt(prev)}</span>}
+    </div>
+  );
+}
+
+// A single vertical wheel column. Renders the full range (0..max) as
+// stacked cells in a scroll-snap container; the cell currently at the
+// vertical centre of the viewport is the selected value. Scrolling
+// snaps to whole rows, so the user's finger always lands on a number.
+function TimeWheel({ max, value, onChange, label }) {
+  const ref = useRef(null);
+  const ITEM_HEIGHT = 36;
+
+  // Sync external value → scroll position. We must wait until the
+  // scroll container has actually rendered with non-zero height before
+  // setting scrollTop, otherwise the assignment becomes a no-op on iOS
+  // Safari. Use useLayoutEffect + a retry loop that bails once the
+  // element is measurable.
+  useLayoutEffect(() => {
+    let cancelled = false;
+    const attempt = () => {
+      if (cancelled) return;
+      const el = ref.current;
+      if (!el) return;
+      const target = value * ITEM_HEIGHT;
+      // If the element has 0 height, layout isn't ready — try again
+      // next frame.
+      if (el.clientHeight === 0) {
+        requestAnimationFrame(attempt);
+        return;
+      }
+      el.scrollTop = target;
+      // Double-check the scroll actually landed (some browsers clamp
+      // to a different value if scroll content was just remounted)
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        if (ref.current && Math.abs(ref.current.scrollTop - target) > 1) {
+          ref.current.scrollTop = target;
+        }
+      });
+    };
+    attempt();
+    return () => { cancelled = true; };
+  }, [value]);
+
+  const timer = useRef(null);
+  const onScroll = () => {
+    const el = ref.current;
+    if (!el) return;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      const idx = Math.round(el.scrollTop / ITEM_HEIGHT);
+      const clamped = Math.max(0, Math.min(max, idx));
+      if (clamped !== value) onChange(clamped);
+    }, 80);
+  };
+
+  const items = [];
+  for (let i = 0; i <= max; i++) items.push(i);
 
   return (
-    <div className="time-dropdown">
-      <select value={hms.h} onChange={(e) => set('h', e.target.value)} aria-label="Hours">
-        {opts(23)}
-      </select>
-      <span className="time-sep">:</span>
-      <select value={hms.m} onChange={(e) => set('m', e.target.value)} aria-label="Minutes">
-        {opts(59)}
-      </select>
-      <span className="time-sep">:</span>
-      <select value={hms.s} onChange={(e) => set('s', e.target.value)} aria-label="Seconds">
-        {opts(59)}
-      </select>
-      {showPrev && <span className="time-prev-hint" title="Previous">{prevFmt}</span>}
+    <div className="time-wheel" aria-label={label}>
+      <div
+        ref={ref}
+        className="time-wheel__list"
+        onScroll={onScroll}
+      >
+        {/* Top spacer so item 0 can sit at the centre row */}
+        <div className="time-wheel__spacer" style={{ height: ITEM_HEIGHT }} />
+        {items.map((n) => (
+          <div
+            key={n}
+            className={`time-wheel__item${n === value ? ' is-selected' : ''}`}
+            style={{ height: ITEM_HEIGHT }}
+          >
+            {String(n).padStart(2, '0')}
+          </div>
+        ))}
+        {/* Bottom spacer so the last item can reach the centre row */}
+        <div className="time-wheel__spacer" style={{ height: ITEM_HEIGHT }} />
+      </div>
+      {/* Centre highlight band */}
+      <div
+        className="time-wheel__centre"
+        style={{ top: ITEM_HEIGHT, height: ITEM_HEIGHT }}
+      />
     </div>
   );
 }

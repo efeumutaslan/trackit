@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
@@ -52,6 +53,24 @@ export default function Settings() {
     <div className="app-shell page-settings">
       <TopBar back title="Settings" />
       <div className="content">
+        {/* ── Library — Templates / Exercises moved here from the bottom nav
+              so the nav can stay slim. These are still full-fledged pages
+              with their own URLs (/templates, /exercises) — this is just
+              the entry point. ──────────────────────────────────────────── */}
+        <div className="section-title">Library</div>
+        <div className="card" style={{ padding: 0 }}>
+          <Link to="/templates" className="settings-link-row">
+            <span className="settings-link-row__icon"><Icon name="ruler" /></span>
+            <span className="settings-link-row__label">Templates</span>
+            <span className="settings-link-row__chev"><Icon name="chevron-right" /></span>
+          </Link>
+          <Link to="/exercises" className="settings-link-row">
+            <span className="settings-link-row__icon"><Icon name="dumbbell" /></span>
+            <span className="settings-link-row__label">Exercises</span>
+            <span className="settings-link-row__chev"><Icon name="chevron-right" /></span>
+          </Link>
+        </div>
+
         {/* ── Rep input placeholder ────────────────────────────────────── */}
         <div className="section-title">Rep input placeholder</div>
         <div className="card">
@@ -118,7 +137,7 @@ export default function Settings() {
         </div>
 
         <div className="small text-muted mt-2" style={{ textAlign: 'center' }}>
-          Manage exercise groups under the <strong>Exercises</strong> tab.
+          Manage exercise groups under the <strong>Exercises</strong> section above.
         </div>
       </div>
     </div>
