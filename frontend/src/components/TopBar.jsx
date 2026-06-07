@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import Icon from './Icon.jsx';
+import Logo from './Logo.jsx';
 
 export default function TopBar({ title, back = false, brand = false, brandSuffix = null, right = null, className = '' }) {
   const nav = useNavigate();
@@ -11,13 +12,10 @@ export default function TopBar({ title, back = false, brand = false, brandSuffix
         <div style={{ width: 36 }} />
       )}
       {brand ? (
-        <span className="brand" style={{ flex: 1, textAlign: 'center' }}>
+        <span className="brand" style={{ flex: 1, textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Logo size={22} className="brand-logo" />
           TrackIt
           {brandSuffix && (
-            // Show the username (or whatever the caller passes in) right
-            // after the logo on Home: "TrackIt — dafather". Keep the brand
-            // color on the logo; the suffix uses the regular ink colour
-            // so it reads as a small label, not a second brand mark.
             <>
               <span className="brand-sep"> — </span>
               <span className="brand-suffix">{brandSuffix}</span>

@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
 import Icon from './Icon.jsx';
+import Logo from './Logo.jsx';
 
 // Vertical navigation, visible only on >=1024px viewports. The bottom-nav
 // is hidden in the same range, so this becomes the sole nav surface for
@@ -12,6 +13,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar" aria-label="Primary">
       <div className="sidebar-brand">
+        <Logo size={26} className="sidebar-logo-mark" />
         <span className="sidebar-logo">TrackIt</span>
       </div>
       <nav className="sidebar-nav">

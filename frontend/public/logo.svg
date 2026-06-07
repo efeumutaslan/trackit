@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Golden-ratio based layout. φ = 1.618.
+       Canvas: 512×512. Padding from edges: 96 (so the safe area is ~320,
+       inside Apple's "rounded square" mask region).
+       Four bars of increasing height that step by φ:
+         bar widths : 64
+         bar gaps   : 24
+         heights    : 80, 128, 200, 312  (each ~×1.6 of the previous)
+       The tallest bar is topped by a glowing ring — the "tracker" point.
+       The ring radius equals the bar width (64), centred 320 from baseline. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#0F100D" />
+      <stop offset="100%" stop-color="#000000" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#D3FF56" stop-opacity="0.55" />
+      <stop offset="60%"  stop-color="#D3FF56" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#D3FF56" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Soft rounded square background (matches the iOS app icon shape) -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bg)" />
+
+  <!-- Glow halo behind the chart -->
+  <circle cx="356" cy="160" r="180" fill="url(#glow)" />
+
+  <!-- The four bars. Baseline at y = 416 (= 512 - 96 padding). -->
+  <!-- Bar 1: shortest, dim accent -->
+  <rect x="76"  y="336" width="64" height="80"  rx="14" fill="#2A3115" />
+  <!-- Bar 2: medium-dim -->
+  <rect x="164" y="288" width="64" height="128" rx="14" fill="#5C6E26" />
+  <!-- Bar 3: brighter -->
+  <rect x="252" y="216" width="64" height="200" rx="14" fill="#9DBF35" />
+  <!-- Bar 4: tallest, the brand accent -->
+  <rect x="340" y="104" width="64" height="312" rx="14" fill="#D3FF56" />
+
+  <!-- Tracker ring on top of bar 4. Centre = (372, 104), radius 38 (≈ bar width × φ / 1.7). -->
+  <circle cx="372" cy="104" r="38" stroke="#D3FF56" stroke-width="14" fill="#0A0A0A" />
+  <!-- Inner dot — emphasises the "marker" -->
+  <circle cx="372" cy="104" r="10" fill="#D3FF56" />
+</svg>

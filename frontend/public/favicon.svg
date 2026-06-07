@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Favicon — designed at 32×32. At browser-tab size (16×16) the bars
+       are 2px wide so we drop to 3 bars instead of 4 (4 would muddy)
+       and remove the tracker ring's stroke (just a dot). -->
+  <rect width="32" height="32" rx="7" fill="#0A0A0A" />
+  <rect x="6"  y="20" width="5" height="6"  rx="1.4" fill="#5C6E26" />
+  <rect x="13" y="16" width="5" height="10" rx="1.4" fill="#9DBF35" />
+  <rect x="20" y="8"  width="5" height="18" rx="1.4" fill="#D3FF56" />
+  <circle cx="22.5" cy="8" r="3" fill="#0A0A0A" stroke="#D3FF56" stroke-width="2" />
+</svg>

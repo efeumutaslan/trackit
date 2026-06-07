@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
 import Icon from '../components/Icon.jsx';
+import Logo from '../components/Logo.jsx';
 
 export default function Login() {
   const { login, register } = useAuth();
@@ -29,6 +30,9 @@ export default function Login() {
 
   return (
     <div className="auth-wrap">
+      {/* Splash mark sits above the wordmark so the bar-chart + tracker
+          ring are the first thing the user sees on the login screen. */}
+      <Logo size={72} className="auth-logo" />
       <div className="brand-big">TrackIt</div>
       <div className="tagline">Track your training</div>
 

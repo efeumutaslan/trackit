@@ -6,7 +6,14 @@
     <meta name="theme-color" content="#0A0A0A" />
     <title>TrackIt</title>
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <!-- Favicons. Modern browsers prefer the SVG (scales perfectly,
+         tiny payload); the ICO is the multi-resolution fallback
+         (16/32/48/64) for older browsers + Windows pinned tabs. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
+    <!-- iOS home-screen icon. 180×180 is the size Safari actually
+         consumes; everything else iOS scales down from there. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="TrackIt" />
