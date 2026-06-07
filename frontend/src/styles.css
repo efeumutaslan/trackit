@@ -789,44 +789,56 @@ a { color: inherit; text-decoration: none; }
   justify-content: center;
 }
 .adjust-btn.adjust-up {
-  /* Soft green tint when resting, lights up to the brand neon-green
-     when "pressed" (= the user picked this adjust). */
-  background: rgba(211, 255, 86, 0.12);
+  /* Rest state — a bright, clearly readable green tint with a glowing
+     border so the button visibly says "tap me to bump up next time".
+     Previous 12%-alpha version was indistinguishable from the card
+     background on the dark canvas. */
+  background: rgba(211, 255, 86, 0.22);
   color: var(--peach);
-  border-color: rgba(211, 255, 86, 0.3);
+  border-color: var(--peach);
 }
 .adjust-btn.adjust-down {
-  background: rgba(255, 107, 107, 0.12);
+  background: rgba(255, 107, 107, 0.22);
   color: var(--red);
-  border-color: rgba(255, 107, 107, 0.3);
+  border-color: var(--red);
 }
+/* Pressed = the user actually selected this adjust. Goes to the
+   darker shade of the accent so the button reads as "depressed"
+   into the surface, with a real inset shadow to sell the click. */
 .adjust-btn.adjust-up.pressed {
-  background: var(--peach);
+  background: #6B8A1F;          /* darker peach-dark territory */
   color: #0A0A0A;
-  border-color: var(--peach);
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+  border-color: #4D6A12;
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.6),
+    inset 0 -1px 0 rgba(255,255,255,0.08);
 }
 .adjust-btn.adjust-down.pressed {
-  background: var(--red);
+  background: #B73838;
   color: #0A0A0A;
-  border-color: var(--red);
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+  border-color: #842424;
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.6),
+    inset 0 -1px 0 rgba(255,255,255,0.08);
 }
 .adjust-btn:active { transform: scale(0.96); }
 
 /* ---------- Exercise card tinted from previous adjust ----------
    The prior session's ▲/▼ choice is shown as a clearly visible green
    or red tint on the next session's exercise card so the user
-   immediately remembers their plan. The earlier 10%-opacity version
-   was invisible against the cream background, so we use a stronger
-   tint plus a 4px coloured left stripe. */
+   immediately remembers their plan. On the dark canvas the previous
+   6%-opacity tint was invisible — bumped to 18% plus a coloured 4px
+   left stripe and a tinted border so the card unambiguously reads as
+   "this one's going up" or "this one's going down". */
 .exercise-block.exercise-block--prev-up {
-  background: rgba(211, 255, 86, 0.06);
+  background: rgba(211, 255, 86, 0.10);
   border-left: 4px solid var(--peach);
+  border-color: rgba(211, 255, 86, 0.35);
 }
 .exercise-block.exercise-block--prev-down {
-  background: rgba(255, 107, 107, 0.06);
+  background: rgba(255, 107, 107, 0.10);
   border-left: 4px solid var(--red);
+  border-color: rgba(255, 107, 107, 0.35);
 }
 /* Previous-note card inside a tinted exercise stays white so it's still readable */
 .exercise-block.exercise-block--prev-up .prev-note-card,
