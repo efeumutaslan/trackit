@@ -62,6 +62,13 @@ router.post('/logout', authMiddleware, (req, res) => {
   res.json({ ok: true });
 });
 
+// Sign out of every device: drop all tokens for this user. Useful if a
+// device is lost or a token may be compromised.
+router.post('/logout-all', authMiddleware, (req, res) => {
+  const info = db.prepare('DELETE FROM sessions_auth WHERE user_id = ?').run(req.userId);
+  res.json({ ok: true, revoked: info.changes });
+});
+
 router.get('/me', authMiddleware, (req, res) => {
   const user = db.prepare('SELECT id, username, created_at FROM users WHERE id = ?').get(req.userId);
   res.json(user);

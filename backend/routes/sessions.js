@@ -17,6 +17,40 @@ function ownsExercise(userId, exerciseId) {
   return !!row;
 }
 
+// ── Input sanitisation ──
+// The client is the only writer today, but a value sent by a broken
+// client (or anyone poking the API directly) shouldn't be able to store
+// nonsense or force the server to insert thousands of rows. These keep
+// stored numbers inside sane physical bounds.
+const MAX_SETS = 50;          // nobody logs >50 sets for one exercise
+const MAX_WEIGHT = 2000;      // kg — well above any real lift
+const MAX_REPS = 10000;
+const MAX_SECONDS = 24 * 3600;     // a single set can't exceed a day
+const MAX_MILEAGE = 1000 * 1000;   // metres (1000 km)
+
+// Clamp an integer count of target sets into [1, MAX_SETS]; default 3.
+function clampSets(n) {
+  const v = parseInt(n, 10);
+  if (!Number.isFinite(v)) return 3;
+  return Math.max(1, Math.min(MAX_SETS, v));
+}
+// Return a non-negative number capped at `max`, or null if the input
+// wasn't a finite number. Negative inputs are treated as invalid → null
+// (so a stray "-50 kg" is dropped rather than stored).
+function sanitizeNum(v, max) {
+  if (v === null) return null;        // explicit clear
+  if (v === undefined) return undefined; // "leave unchanged" sentinel
+  const n = typeof v === 'number' ? v : parseFloat(v);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.min(n, max);
+}
+// Integer variant of the above.
+function sanitizeInt(v, max) {
+  const n = sanitizeNum(v, max);
+  if (n === null || n === undefined) return n;
+  return Math.round(n);
+}
+
 function getPrevWorkoutNotes(userId, templateId, beforeDate) {
   if (!templateId) return '';
   const row = db.prepare(`
@@ -392,7 +426,7 @@ router.post('/', (req, res) => {
         startSide
       );
       const seId = seInfo.lastInsertRowid;
-      const setsCount = ex.target_sets || 3;
+      const setsCount = clampSets(ex.target_sets);
       // Pre-fill weight, time and mileage from the most recent prior
       // session that the user actually logged data in — for the side we
       // are opening on. Same recall behaviour as kg → the user sees
@@ -494,6 +528,9 @@ router.post('/:id/exercises', (req, res) => {
   if (!ownsExercise(req.userId, exercise_id)) {
     return res.status(403).json({ error: 'Exercise not found' });
   }
+  const setsN = clampSets(target_sets);
+  const tTime = sanitizeInt(target_time_s, MAX_SECONDS);
+  const tMile = sanitizeInt(target_mileage_m, MAX_MILEAGE);
   const maxOrder = db.prepare('SELECT COALESCE(MAX(order_idx), -1) AS m FROM session_exercises WHERE session_id = ?').get(id).m;
   const prevNote = getPrevExerciseNotes(req.userId, exercise_id, cur.session_date);
   const info = db.prepare(`
@@ -503,8 +540,8 @@ router.post('/:id/exercises', (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, exercise_id, maxOrder + 1,
-    target_sets || 3, target_reps || '',
-    target_time_s || null, target_mileage_m || null,
+    setsN, target_reps || '',
+    tTime ?? null, tMile ?? null,
     prevNote
   );
   const seId = info.lastInsertRowid;
@@ -515,7 +552,7 @@ router.post('/:id/exercises', (req, res) => {
   const ins = db.prepare(
     'INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, time_seconds, mileage_m) VALUES (?, ?, ?, ?, ?)'
   );
-  for (let i = 1; i <= (target_sets || 3); i++) {
+  for (let i = 1; i <= setsN; i++) {
     const w = prevWeights [i - 1] != null ? prevWeights [i - 1] : null;
     const t = prevTimes   [i - 1] != null ? prevTimes   [i - 1] : null;
     const m = prevMileages[i - 1] != null ? prevMileages[i - 1] : null;
@@ -723,18 +760,29 @@ router.put('/:id/sets/:setId', (req, res) => {
     target_time_s, target_mileage_m,
   } = req.body || {};
 
+  // Clamp every numeric field. sanitizeNum/Int returns:
+  //   undefined → field absent, keep existing value
+  //   null      → explicit clear OR invalid (e.g. negative) → store NULL
+  //   number    → valid, capped at the physical max
+  const wk = sanitizeNum(weight_kg, MAX_WEIGHT);
+  const rd = sanitizeInt(reps_done, MAX_REPS);
+  const ts = sanitizeInt(time_seconds, MAX_SECONDS);
+  const mm = sanitizeInt(mileage_m, MAX_MILEAGE);
+  const tt = sanitizeInt(target_time_s, MAX_SECONDS);
+  const tm = sanitizeInt(target_mileage_m, MAX_MILEAGE);
+
   db.prepare(`
     UPDATE session_sets
     SET weight_kg = ?, reps_done = ?, time_seconds = ?, mileage_m = ?,
         target_time_s = ?, target_mileage_m = ?
     WHERE id = ?
   `).run(
-    weight_kg        !== undefined ? weight_kg        : setRow.weight_kg,
-    reps_done        !== undefined ? reps_done        : setRow.reps_done,
-    time_seconds     !== undefined ? time_seconds     : setRow.time_seconds,
-    mileage_m        !== undefined ? mileage_m        : setRow.mileage_m,
-    target_time_s    !== undefined ? target_time_s    : setRow.target_time_s,
-    target_mileage_m !== undefined ? target_mileage_m : setRow.target_mileage_m,
+    wk !== undefined ? wk : setRow.weight_kg,
+    rd !== undefined ? rd : setRow.reps_done,
+    ts !== undefined ? ts : setRow.time_seconds,
+    mm !== undefined ? mm : setRow.mileage_m,
+    tt !== undefined ? tt : setRow.target_time_s,
+    tm !== undefined ? tm : setRow.target_mileage_m,
     setId
   );
   res.json({ ok: true });
@@ -765,12 +813,25 @@ router.delete('/:id/sets/:setId', (req, res) => {
   if (!cur) return res.status(404).json({ error: 'Not found' });
   // FIX: verify the set belongs to this session before deleting
   const setRow = db.prepare(`
-    SELECT ss.id FROM session_sets ss
+    SELECT ss.id, ss.session_exercise_id, ss.alt_active FROM session_sets ss
     JOIN session_exercises se ON se.id = ss.session_exercise_id
     WHERE ss.id = ? AND se.session_id = ?
   `).get(setId, id);
   if (!setRow) return res.status(404).json({ error: 'Not found' });
-  db.prepare('DELETE FROM session_sets WHERE id = ?').run(setId);
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM session_sets WHERE id = ?').run(setId);
+    // Close the gap so set numbers stay 1,2,3… within the same SE/side
+    // (deleting the middle set used to leave [1,3,4]). Renumber by the
+    // current order; each side (alt_active 0/1) is numbered independently.
+    const remaining = db.prepare(`
+      SELECT id FROM session_sets
+      WHERE session_exercise_id = ? AND alt_active = ?
+      ORDER BY set_number, id
+    `).all(setRow.session_exercise_id, setRow.alt_active);
+    const upd = db.prepare('UPDATE session_sets SET set_number = ? WHERE id = ?');
+    remaining.forEach((r, i) => upd.run(i + 1, r.id));
+  });
+  tx();
   res.json({ ok: true });
 });
 

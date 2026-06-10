@@ -196,4 +196,16 @@ CREATE TABLE IF NOT EXISTS user_settings (
 );
 `);
 
+// Purge auth tokens older than 90 days on startup so the table doesn't
+// grow unbounded (authMiddleware also rejects them lazily per request,
+// but nothing was ever deleting the stale rows). Matches the 90-day
+// window enforced in auth.js.
+try {
+  const cutoff = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+  const purged = db.prepare("DELETE FROM sessions_auth WHERE created_at < ?").run(cutoff);
+  if (purged.changes) console.log(`Purged ${purged.changes} expired auth token(s)`);
+} catch (e) {
+  console.error('Token purge skipped:', e.message);
+}
+
 console.log('DB ready:', DB_PATH);

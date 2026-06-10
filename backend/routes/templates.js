@@ -18,6 +18,13 @@ function validateExerciseOwnership(userId, exercises) {
   );
 }
 
+// Keep target_sets within sane bounds (1..50); default 3.
+function clampSets(n) {
+  const v = parseInt(n, 10);
+  if (!Number.isFinite(v)) return 3;
+  return Math.max(1, Math.min(50, v));
+}
+
 const PRESET_COLORS = [
   '#FFB07A', '#7AC4FF', '#9CD879', '#FF7A9C',
   '#C49CFF', '#FFD06B', '#5BC5C5', '#FF8C61',
@@ -89,7 +96,7 @@ router.post('/', (req, res) => {
     (exercises || []).forEach((ex, idx) => {
       insertEx.run(
         info.lastInsertRowid, ex.exercise_id, idx,
-        ex.target_sets || 3, ex.target_reps || '',
+        clampSets(ex.target_sets), ex.target_reps || '',
         ex.target_time_s || null, ex.target_mileage_m || null,
         ex.alt_exercise_id || null,
         ex.superset_tag || '', ex.rest_seconds || null
@@ -124,7 +131,7 @@ router.put('/:id', (req, res) => {
       exercises.forEach((ex, idx) => {
         stmt.run(
           id, ex.exercise_id, idx,
-          ex.target_sets || 3, ex.target_reps || '',
+          clampSets(ex.target_sets), ex.target_reps || '',
           ex.target_time_s || null, ex.target_mileage_m || null,
           ex.alt_exercise_id || null,
           ex.superset_tag || '', ex.rest_seconds || null

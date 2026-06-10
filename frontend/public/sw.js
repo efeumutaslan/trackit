@@ -6,8 +6,8 @@
 //   - API responses: network-only. We never serve stale workout data.
 //   - Static assets in /assets/: stale-while-revalidate (Vite hashes them).
 //   - Icons and manifest: cache-first.
-const SHELL_CACHE = 'trackit-shell-v1';
-const ASSET_CACHE = 'trackit-assets-v1';
+const SHELL_CACHE = 'trackit-shell-v2';
+const ASSET_CACHE = 'trackit-assets-v2';
 const SHELL = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {

@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
+import { useAuth } from '../lib/auth.jsx';
 import Icon from '../components/Icon.jsx';
 
 export default function Settings() {
   const [settings, setSettings] = useState(null);
   const [importStatus, setImportStatus] = useState('');
+  const { logoutAll } = useAuth();
 
   useEffect(() => {
     api.get('/settings').then(setSettings).catch(() => {});
@@ -47,6 +49,11 @@ export default function Settings() {
       setImportStatus('Import failed: ' + (err.message || err));
     }
     e.target.value = '';
+  }
+
+  async function handleLogoutAll() {
+    if (!confirm('Sign out of all devices? You will need to sign in again everywhere.')) return;
+    await logoutAll();
   }
 
   return (
@@ -133,6 +140,17 @@ export default function Settings() {
           </div>
           <div className="small text-muted mt-2">
             Export gives one row per set. Import is additive — it never overwrites existing data.
+          </div>
+        </div>
+
+        {/* ── Account ──────────────────────────────────────────────────── */}
+        <div className="section-title">Account</div>
+        <div className="card">
+          <button className="btn ghost" onClick={handleLogoutAll}>
+            <Icon name="sign-out" /> Sign out of all devices
+          </button>
+          <div className="small text-muted mt-1">
+            Revokes every active session. Use this if a device was lost.
           </div>
         </div>
 

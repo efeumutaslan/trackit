@@ -32,8 +32,24 @@ app.use('/api/settings', settingsRoutes);
 
 // Production: serve frontend build
 const publicDir = path.join(__dirname, 'public');
-app.use(express.static(publicDir));
+
+// Cache policy:
+//  - /assets/* are content-hashed by Vite → safe to cache forever.
+//  - index.html and the service worker MUST NOT be cached, or a deploy
+//    won't be picked up until the user manually clears Safari's cache
+//    (the recurring "had to wipe the PWA after every deploy" problem).
+app.use(express.static(publicDir, {
+  setHeaders(res, filePath) {
+    if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (filePath.endsWith('sw.js') || filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  },
+}));
 app.get(/^\/(?!api).*/, (req, res) => {
+  // The SPA fallback always returns index.html; never let it be cached.
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 

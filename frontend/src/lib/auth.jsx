@@ -45,8 +45,17 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
+  // Revoke every token for this account (all devices), then clear local
+  // session like a normal logout.
+  async function logoutAll() {
+    try { await api.post('/auth/logout-all'); } catch {}
+    setToken(null);
+    setStoredUser(null);
+    setUser(null);
+  }
+
   return (
-    <AuthCtx.Provider value={{ user, loading, login, register, logout }}>
+    <AuthCtx.Provider value={{ user, loading, login, register, logout, logoutAll }}>
       {children}
     </AuthCtx.Provider>
   );
