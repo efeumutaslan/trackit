@@ -602,11 +602,11 @@ router.put('/:id/exercises/:seId', (req, res) => {
     aNotes, aAdjust,
     bNotes, bAdjust,
     target_reps      ?? se.target_reps,
-    target_sets      ?? se.target_sets,
+    target_sets !== undefined ? clampSets(target_sets) : se.target_sets,
     superset_tag     ?? se.superset_tag,
     rest_seconds     !== undefined ? rest_seconds     : se.rest_seconds,
-    target_time_s    !== undefined ? target_time_s    : se.target_time_s,
-    target_mileage_m !== undefined ? target_mileage_m : se.target_mileage_m,
+    target_time_s    !== undefined ? sanitizeInt(target_time_s, MAX_SECONDS) ?? null : se.target_time_s,
+    target_mileage_m !== undefined ? sanitizeInt(target_mileage_m, MAX_MILEAGE) ?? null : se.target_mileage_m,
     alt_exercise_id  !== undefined ? alt_exercise_id  : se.alt_exercise_id,
     newAltActive,
     seId
@@ -622,7 +622,7 @@ router.put('/:id/exercises/:seId', (req, res) => {
       'SELECT COUNT(*) AS n FROM session_sets WHERE session_exercise_id = ? AND alt_active = ?'
     ).get(seId, newAltActive).n;
     if (existing === 0) {
-      const targetN = (target_sets ?? se.target_sets) || 3; // FIX: use updated value
+      const targetN = clampSets(target_sets ?? se.target_sets); // clamp the updated value
       const sideExerciseId = newAltActive === 1 ? se.alt_exercise_id : se.exercise_id;
       let prevWeights = [], prevTimes = [], prevMileages = [];
       let prevNote = '', prevAdjust = '';
