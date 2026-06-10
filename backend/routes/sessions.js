@@ -217,16 +217,20 @@ function loadSession(userId, sessionId) {
     ex.tonnage = totals.tonnage;
     ex.total_reps = totals.reps;
     // previous session tonnage for the same exercise (chronological order)
+    // FIX: compare the ACTIVE side's exercise, match it in either A/B role
+    // in prior sessions, and sum only that side's sets.
+    const cmpExId = (activeSide === 1 && ex.alt_exercise_id) ? ex.alt_exercise_id : ex.exercise_id;
     const prev = db.prepare(`
       SELECT COALESCE(SUM(ss.weight_kg * ss.reps_done), 0) AS tonnage
       FROM workout_sessions ws
       JOIN session_exercises se ON se.session_id = ws.id
       LEFT JOIN session_sets ss ON ss.session_exercise_id = se.id
-      WHERE ws.user_id = ? AND se.exercise_id = ?
+        AND ss.alt_active = CASE WHEN se.exercise_id = ? THEN 0 ELSE 1 END
+      WHERE ws.user_id = ? AND (se.exercise_id = ? OR se.alt_exercise_id = ?)
         AND (ws.session_date, ws.created_at, ws.id) < (?, ?, ?)
       GROUP BY ws.id
       ORDER BY ws.session_date DESC, ws.created_at DESC, ws.id DESC LIMIT 1
-    `).get(userId, ex.exercise_id, s.session_date, s.created_at, s.id);
+    `).get(cmpExId, userId, cmpExId, cmpExId, s.session_date, s.created_at, s.id);
     ex.prev_tonnage = prev?.tonnage || 0;
 
     // resolve previous exercise note dynamically.
@@ -560,7 +564,7 @@ router.put('/:id/exercises/:seId', (req, res) => {
       'SELECT COUNT(*) AS n FROM session_sets WHERE session_exercise_id = ? AND alt_active = ?'
     ).get(seId, newAltActive).n;
     if (existing === 0) {
-      const targetN = se.target_sets || 3;
+      const targetN = (target_sets ?? se.target_sets) || 3; // FIX: use updated value
       const sideExerciseId = newAltActive === 1 ? se.alt_exercise_id : se.exercise_id;
       let prevWeights = [], prevTimes = [], prevMileages = [];
       let prevNote = '', prevAdjust = '';
@@ -738,6 +742,13 @@ router.delete('/:id/sets/:setId', (req, res) => {
   const cur = db.prepare('SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?')
     .get(id, req.userId);
   if (!cur) return res.status(404).json({ error: 'Not found' });
+  // FIX: verify the set belongs to this session before deleting
+  const setRow = db.prepare(`
+    SELECT ss.id FROM session_sets ss
+    JOIN session_exercises se ON se.id = ss.session_exercise_id
+    WHERE ss.id = ? AND se.session_id = ?
+  `).get(setId, id);
+  if (!setRow) return res.status(404).json({ error: 'Not found' });
   db.prepare('DELETE FROM session_sets WHERE id = ?').run(setId);
   res.json({ ok: true });
 });

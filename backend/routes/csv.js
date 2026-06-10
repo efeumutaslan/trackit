@@ -142,16 +142,17 @@ router.post('/import', (req, res) => {
       const exOrder     = +(get('exercise_order') || 0) || 0;
       const tgtSets     = +(get('target_sets') || 3) || 3;
       const tgtReps     = get('target_reps') || '';
-      const tgtTime     = parseInt(get('target_time_s'), 10) || null;
-      const tgtMile     = parseInt(get('target_mileage_m'), 10) || null;
+      // FIX: Number.isFinite so 0 survives the roundtrip (|| null swallowed it)
+      const tt = parseInt(get('target_time_s'), 10);    const tgtTime = Number.isFinite(tt) ? tt : null;
+      const tm = parseInt(get('target_mileage_m'), 10); const tgtMile = Number.isFinite(tm) ? tm : null;
       const ssTag       = get('superset_tag') || '';
       const adj         = get('weight_adjust') || '';
       const exNotes     = get('exercise_notes') || '';
       const setNum      = +(get('set_number') || 1) || 1;
       const w           = parseFloat(get('weight_kg')); const wkg = Number.isFinite(w) ? w : null;
       const r           = parseInt(get('reps_done'), 10); const rps = Number.isFinite(r) ? r : null;
-      const tsec        = parseInt(get('time_seconds'), 10) || null;
-      const mm          = parseInt(get('mileage_m'), 10)    || null;
+      const ts          = parseInt(get('time_seconds'), 10); const tsec = Number.isFinite(ts) ? ts : null;
+      const mi          = parseInt(get('mileage_m'), 10);    const mm   = Number.isFinite(mi) ? mi : null;
 
       const sKey = `${sdate}|${startedAt || ''}|${tplName || ''}`;
       let bucket = sessionMap.get(sKey);

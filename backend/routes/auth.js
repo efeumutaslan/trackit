@@ -5,7 +5,20 @@ import { generateToken, authMiddleware } from '../auth.js';
 
 const router = Router();
 
-router.post('/register', async (req, res) => {
+// FIX: simple in-memory rate limit — 10 attempts / 15 min per IP
+const attempts = new Map(); // ip -> { count, resetAt }
+function rateLimit(req, res, next) {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
+  const now = Date.now();
+  let e = attempts.get(ip);
+  if (!e || now > e.resetAt) { e = { count: 0, resetAt: now + 15 * 60 * 1000 }; attempts.set(ip, e); }
+  if (e.count >= 10) return res.status(429).json({ error: 'Too many attempts, try again later' });
+  e.count++;
+  if (attempts.size > 10000) attempts.clear();
+  next();
+}
+
+router.post('/register', rateLimit, async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
@@ -30,7 +43,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', rateLimit, async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });

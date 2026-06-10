@@ -13,7 +13,7 @@ const PRESET_COLORS = [
 
 function pickUnusedColor(userId) {
   const used = new Set(
-    db.prepare('SELECT color FROM templates WHERE user_id = ?').all(userId).map(r => r.color)
+    db.prepare('SELECT color FROM templates WHERE user_id = ? AND archived = 0').all(userId).map(r => r.color)
   );
   const fresh = PRESET_COLORS.find(c => !used.has(c));
   if (fresh) return fresh;

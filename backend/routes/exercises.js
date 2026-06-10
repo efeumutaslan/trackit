@@ -21,10 +21,23 @@ router.get('/', (req, res) => {
 router.post('/', (req, res) => {
   const { name, notes, group_id } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+  const cleanName = name.trim();
   try {
+    // FIX: resurrect an archived exercise with the same name instead of
+    // failing UNIQUE(user_id, name) — same pattern as groups.js
+    const archived = db
+      .prepare('SELECT * FROM exercises WHERE user_id = ? AND name = ? AND archived = 1')
+      .get(req.userId, cleanName);
+    if (archived) {
+      db.prepare('UPDATE exercises SET archived = 0, notes = ?, group_id = ? WHERE id = ?')
+        .run(notes || archived.notes,
+             group_id !== undefined ? group_id : archived.group_id,
+             archived.id);
+      return res.json(db.prepare('SELECT * FROM exercises WHERE id = ?').get(archived.id));
+    }
     const info = db
       .prepare('INSERT INTO exercises (user_id, name, notes, group_id) VALUES (?, ?, ?, ?)')
-      .run(req.userId, name.trim(), notes || '', group_id || null);
+      .run(req.userId, cleanName, notes || '', group_id || null);
     const row = db.prepare('SELECT * FROM exercises WHERE id = ?').get(info.lastInsertRowid);
     res.json(row);
   } catch (e) {
