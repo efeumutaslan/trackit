@@ -1,16 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import Icon from './Icon.jsx';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // GitHub-style yearly heatmap. The user picks a calendar year via the
 // dropdown; the grid then shows that entire year's workout density.
-// Months are visually separated with a thin vertical line so each block
-// reads as its own chunk rather than one long ribbon of weeks.
+//
+// Layout: the year is rendered as 12 MONTH GROUPS. Each group is a
+// vertical stack of [month label pill] + [that month's week-columns].
+// Because the label lives INSIDE the same flex item as its columns, it
+// is always exactly above its own month — no separate label row to
+// drift out of alignment, and the whole strip scrolls as one unit on
+// narrow screens.
 export default function Heatmap({ onMonthClick } = {}) {
   const [byDate, setByDate] = useState({});
   const [year, setYear] = useState(new Date().getFullYear());
+  // When a day holds more than one workout we can't just navigate —
+  // open a picker modal listing that day's sessions instead.
+  const [dayPick, setDayPick] = useState(null); // { iso, list } | null
   const nav = useNavigate();
   const today = new Date();
 
@@ -46,7 +55,6 @@ export default function Heatmap({ onMonthClick } = {}) {
   // fall outside the year are rendered blank.
   const yearStart = new Date(year, 0, 1);
   const yearEnd   = new Date(year, 11, 31);
-  // back up to the Monday on/before Jan 1
   const startOffsetMon = (yearStart.getDay() + 6) % 7;
   const gridStart = new Date(yearStart);
   gridStart.setDate(yearStart.getDate() - startOffsetMon);
@@ -68,31 +76,36 @@ export default function Heatmap({ onMonthClick } = {}) {
     if (cols.length > 54) break;
   }
 
-  // Month label appears at the first column whose first in-year day's
-  // month differs from the previous column's first in-year day's month.
-  // We also flag those columns so CSS can paint a separator line.
-  const monthLabels = cols.map((col, ci) => {
+  // Group consecutive columns by the month of their first in-year day.
+  // Each group renders as [label pill above] + [columns below], so the
+  // label can never drift away from its own weeks.
+  const groups = [];
+  for (const col of cols) {
     const dayInYear = col.find((d) => d.inYear);
-    if (!dayInYear) return { label: '', isStart: false, monthIdx: null };
-    const m = dayInYear.date.getMonth();
-    const prevCol = ci > 0 ? cols[ci - 1] : null;
-    const prevDay = prevCol ? prevCol.find((d) => d.inYear) : null;
-    const prevM = prevDay ? prevDay.date.getMonth() : -1;
-    const isStart = m !== prevM;
-    return { label: isStart ? MONTHS[m] : '', isStart, monthIdx: m };
-  });
+    const m = dayInYear ? dayInYear.date.getMonth() : null;
+    const last = groups[groups.length - 1];
+    if (last && last.monthIdx === m) last.cols.push(col);
+    else groups.push({ monthIdx: m, cols: [col] });
+  }
 
   function dayStyle(list) {
     if (!list || list.length === 0) return null;
     const color = list[0]?.template_color || 'var(--peach)';
-    const intensity = Math.min(1, 0.45 + list.length * 0.25);
-    return { background: color, opacity: intensity };
+    return { background: color };
   }
 
   function onCellClick(iso, list) {
     if (!list || list.length === 0) return;
-    if (list.length === 1) nav(`/sessions/${list[0].id}`);
+    if (list.length === 1) { nav(`/sessions/${list[0].id}`); return; }
+    // Multiple workouts that day — let the user pick which one to open.
+    setDayPick({ iso, list });
   }
+
+  // DD.MM.YYYY for the picker title
+  const fmtDate = (iso) => {
+    const [y, m, d] = iso.split('-');
+    return `${d}.${m}.${y}`;
+  };
 
   return (
     <div className="heatmap">
@@ -106,58 +119,78 @@ export default function Heatmap({ onMonthClick } = {}) {
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>
-      <div className="heatmap-months">
-        {monthLabels.map((m, ci) => (
-          <div
-            key={ci}
-            className={`heatmap-month${m.label && onMonthClick ? ' heatmap-month--clickable' : ''}`}
-            // Clicking a month name jumps the parent's view to that
-            // month's Calendar. Only attached when the label is actually
-            // shown (the first column of a month).
-            onClick={() => {
-              if (m.label && onMonthClick && m.monthIdx != null) {
-                // Months are 1-indexed in Calendar's URL/state.
-                onMonthClick(year, m.monthIdx + 1);
-              }
-            }}
-            role={m.label && onMonthClick ? 'button' : undefined}
-          >
-            {m.label}
+      <div className="heatmap-scroll">
+        {groups.map((g, gi) => (
+          <div className={`heatmap-group${gi > 0 ? ' month-start' : ''}`} key={gi}>
+            <div
+              className={`heatmap-month${g.monthIdx != null && onMonthClick ? ' heatmap-month--clickable' : ''}`}
+              onClick={() => {
+                if (g.monthIdx != null && onMonthClick) {
+                  // Months are 1-indexed in Calendar's URL/state.
+                  onMonthClick(year, g.monthIdx + 1);
+                }
+              }}
+              role={g.monthIdx != null && onMonthClick ? 'button' : undefined}
+            >
+              {g.monthIdx != null ? MONTHS[g.monthIdx] : ''}
+            </div>
+            <div className="heatmap-group-cols">
+              {g.cols.map((col, ci) => (
+                <div className="heatmap-col" key={ci}>
+                  {col.map((d, ri) => {
+                    if (!d.inYear) {
+                      return <div key={ri} className="heatmap-cell outside" />;
+                    }
+                    const list = byDate[d.iso] || [];
+                    const isFuture = d.date > today;
+                    return (
+                      <div
+                        key={ri}
+                        className={`heatmap-cell${list.length ? ' has-session' : ''}${isFuture ? ' future' : ''}`}
+                        style={dayStyle(list)}
+                        title={list.length ? `${d.iso} · ${list.length} workout${list.length > 1 ? 's' : ''}` : d.iso}
+                        onClick={() => onCellClick(d.iso, list)}
+                      >
+                        {list.length > 1 && <span className="heatmap-cell__multi">{list.length}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>
-      <div className="heatmap-grid">
-        {cols.map((col, ci) => (
-          <div
-            className={`heatmap-col${monthLabels[ci].isStart && ci > 0 ? ' month-start' : ''}`}
-            key={ci}
-          >
-            {col.map((d, ri) => {
-              if (!d.inYear) {
-                return <div key={ri} className="heatmap-cell outside" />;
-              }
-              const list = byDate[d.iso] || [];
-              const isFuture = d.date > today;
-              return (
-                <div
-                  key={ri}
-                  className={`heatmap-cell${list.length ? ' has-session' : ''}${isFuture ? ' future' : ''}`}
-                  style={dayStyle(list)}
-                  title={list.length ? `${d.iso} · ${list.length} workout${list.length > 1 ? 's' : ''}` : d.iso}
-                  onClick={() => onCellClick(d.iso, list)}
-                />
-              );
-            })}
+
+      {dayPick && (
+        <div className="modal-bg" onClick={() => setDayPick(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="calendar" /> {fmtDate(dayPick.iso)}
+            </h3>
+            <div className="small text-muted" style={{ marginBottom: 10 }}>
+              {dayPick.list.length} workouts — pick one to open
+            </div>
+            {dayPick.list.map((w) => (
+              <div
+                className="list-row"
+                key={w.id}
+                onClick={() => { setDayPick(null); nav(`/sessions/${w.id}`); }}
+              >
+                <div className="meta">
+                  <span
+                    className="heatmap-pick__dot"
+                    style={{ background: w.template_color || 'var(--peach)' }}
+                  />
+                  {w.template_name || 'Workout'}
+                </div>
+                <span style={{ color: 'var(--gray)' }}><Icon name="chevron-right" /></span>
+              </div>
+            ))}
+            <button className="btn ghost mt-1" onClick={() => setDayPick(null)}>Cancel</button>
           </div>
-        ))}
-      </div>
-      <div className="calendar-legend" style={{ marginTop: 8 }}>
-        <span>Less</span>
-        <span className="legend-box" style={{ opacity: 0.45 }} />
-        <span className="legend-box" style={{ opacity: 0.7 }} />
-        <span className="legend-box" style={{ opacity: 0.95 }} />
-        <span>More</span>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -23,6 +23,8 @@ import { faChevronLeft } from '@fortawesome/free-solid-svg-icons/faChevronLeft';
 import { faChevronRight } from '@fortawesome/free-solid-svg-icons/faChevronRight';
 
 import { faStopwatch } from '@fortawesome/free-solid-svg-icons/faStopwatch';
+import { faCalendarDays } from '@fortawesome/free-solid-svg-icons/faCalendarDays';
+import { faPen } from '@fortawesome/free-solid-svg-icons/faPen';
 import { faFlagCheckered } from '@fortawesome/free-solid-svg-icons/faFlagCheckered';
 import { faScroll } from '@fortawesome/free-solid-svg-icons/faScroll';
 import { faArrowsRotate } from '@fortawesome/free-solid-svg-icons/faArrowsRotate';
@@ -44,7 +46,7 @@ library.add(
   faHouse, faClipboardList, faRulerCombined, faDumbbell, faScaleBalanced, faGear,
   faArrowUp, faArrowDown, faRightLeft, faXmark, faPlus, faMinus,
   faCaretUp, faCaretDown, faChevronLeft, faChevronRight,
-  faStopwatch, faFlagCheckered, faScroll, faArrowsRotate, faFloppyDisk,
+  faStopwatch, faCalendarDays, faPen, faFlagCheckered, faScroll, faArrowsRotate, faFloppyDisk,
   faFaceFlushed, faFaceFrown, faFaceMehBlank, faFaceSmile, faFaceGrinStars,
   faFileExport, faFileImport,
   faRightFromBracket, faUser,
@@ -70,6 +72,8 @@ const REGISTRY = {
   'chevron-right': faChevronRight,
 
   stopwatch: faStopwatch,
+  calendar: faCalendarDays,
+  edit: faPen,
   'flag-checkered': faFlagCheckered,
   scroll: faScroll,
   refresh: faArrowsRotate,

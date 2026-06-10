@@ -907,7 +907,7 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime
           {showCols?.time ? (
             <TimePicker
               value={set.time_seconds}
-              prev={prevTime}
+              spanCols={!showCols?.mileage}
               onCommit={async (sec) => {
                 await api.put(`/sessions/${sessionId}/sets/${set.id}`, { time_seconds: sec });
                 if (onSaved) await onSaved({ kind: 'time' });
@@ -923,10 +923,10 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime
               onFocus={selectAll}
               onChange={(e) => setMStr(e.target.value.replace(/[^0-9]/g, ''))}
               onBlur={saveMileage}
-              placeholder={prevMileage != null ? String(prevMileage) : 'metres'}
+              placeholder="m"
             />
           ) : <div />}
-          <div />
+          {showCols?.time && !showCols?.mileage ? null : <div />}
         </div>
       )}
     </div>
@@ -934,13 +934,15 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime
 }
 
 // Time input. On mobile this is a 3-column wheel picker (iOS-style)
-// styled with CSS scroll-snap so it has the same tactile feel as the
-// alarm clock duration picker. The user scrolls each column, the row
-// in the centre is the selected value. There's also a text-input mode
-// (toggled by tapping the value) for power users / desktop. The
-// desktop screen size is wide enough that we just always render the
-// text input there, since wheels don't help with a keyboard + mouse.
-function TimePicker({ value, prev, onCommit }) {
+// styled with CSS scroll-snap, plus a keyboard toggle for manual entry.
+// On desktop (>=1024px) only the text input is rendered — wheels don't
+// help with a keyboard + mouse.
+//
+// The text input is a left-shifting digit buffer: the user just types
+// digits and they flow in from the right ("3000" → 00:30:00, then
+// typing "5" → 03:00:05 ... etc). No cursor management, no colon
+// typing — fastest possible manual entry on both platforms.
+function TimePicker({ value, onCommit, spanCols = false }) {
   const init = (sec) => {
     const s = sec ?? 0;
     return {
@@ -950,9 +952,6 @@ function TimePicker({ value, prev, onCommit }) {
     };
   };
   const [hms, setHms] = useState(init(value));
-  // Two modes: 'wheel' (mobile default) and 'text' (toggle via the
-  // pencil button or always-on for desktop). The viewport check is
-  // matchMedia so it reacts to rotation.
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
   );
@@ -963,17 +962,29 @@ function TimePicker({ value, prev, onCommit }) {
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
-  const [mode, setMode] = useState(isDesktop ? 'text' : 'wheel');
-  // re-init local state whenever the upstream value changes (eg
-  // toggling A↔B side reloads).
-  useEffect(() => { setHms(init(value)); }, [value]);
+  const [mode, setMode] = useState('wheel');
+
+  // The wheel reports every committed value through this ref. When the
+  // session reloads after a save, the new `value` prop equals what the
+  // wheel itself just reported — re-syncing scrollTop in that case is
+  // what used to make the wheel stutter mid-flick. We only push the
+  // scroll position when the value changed EXTERNALLY (A/B toggle,
+  // another device, etc).
+  const lastReported = useRef(value ?? null);
+  useEffect(() => {
+    if ((value ?? null) !== lastReported.current) {
+      lastReported.current = value ?? null;
+      setHms(init(value));
+    }
+  }, [value]);
 
   const commit = (next) => {
     setHms(next);
-    onCommit(next.h * 3600 + next.m * 60 + next.s);
+    const sec = next.h * 3600 + next.m * 60 + next.s;
+    lastReported.current = sec;
+    onCommit(sec);
   };
 
-  // Format the current value as HH:MM:SS for text mode and the prev hint
   const fmt = (sec) => {
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
@@ -981,51 +992,70 @@ function TimePicker({ value, prev, onCommit }) {
     return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':');
   };
 
-  // Text-input mode parses a user-typed HH:MM:SS / MM:SS / SS
-  const [textVal, setTextVal] = useState(value != null ? fmt(value) : '');
-  useEffect(() => { setTextVal(value != null ? fmt(value) : ''); }, [value]);
+  // ── Manual entry: digit buffer ──
+  // Stored as a plain digit string (max 6). Rendering pads it to 6 and
+  // formats HH:MM:SS, so typing left-shifts naturally.
+  const secToDigits = (sec) => {
+    if (sec == null) return '';
+    const { h, m, s } = init(sec);
+    return `${String(h).padStart(2, '0')}${String(m).padStart(2, '0')}${String(s).padStart(2, '0')}`;
+  };
+  const [digits, setDigits] = useState(secToDigits(value));
+  useEffect(() => {
+    if ((value ?? null) !== lastReported.current) return; // handled above
+    setDigits(secToDigits(value));
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  const digitsToDisplay = (d) => {
+    if (d === '') return '';
+    const p = d.padStart(6, '0');
+    return `${p.slice(0, 2)}:${p.slice(2, 4)}:${p.slice(4, 6)}`;
+  };
+  const onTextChange = (e) => {
+    // Strip formatting; keep the last 6 digits typed.
+    const d = e.target.value.replace(/\D/g, '').slice(-6);
+    setDigits(d);
+  };
   const onTextBlur = () => {
-    const parts = textVal.split(':').map((p) => parseInt(p, 10) || 0);
-    while (parts.length < 3) parts.unshift(0);
-    const [h, m, s] = parts.slice(-3);
+    if (digits === '') { lastReported.current = null; onCommit(null); return; }
+    const p = digits.padStart(6, '0');
+    const h = parseInt(p.slice(0, 2), 10);
+    const m = parseInt(p.slice(2, 4), 10);
+    const s = parseInt(p.slice(4, 6), 10);
     commit({ h, m, s });
+    setDigits(secToDigits(h * 3600 + m * 60 + s));
   };
 
-  // Prior pill — shown only when current value is null (empty set).
-  // Once the user picks anything the pill disappears so we don't keep
-  // shouting last week's number at them.
-  const showPrev = value == null && prev != null && prev > 0;
+  const wrapStyle = spanCols ? { gridColumn: '2 / 4' } : undefined;
 
   if (isDesktop || mode === 'text') {
     return (
-      <div className="time-picker time-picker--text">
+      <div className="time-picker time-picker--text" style={wrapStyle}>
         <input
           type="text"
           inputMode="numeric"
           className="time-text-input"
-          value={textVal}
-          onChange={(e) => setTextVal(e.target.value.replace(/[^0-9:]/g, ''))}
+          value={digitsToDisplay(digits)}
+          onChange={onTextChange}
           onBlur={onTextBlur}
-          placeholder="HH:MM:SS"
+          placeholder="00:00:00"
         />
         {!isDesktop && (
           <button
             type="button"
             className="time-mode-toggle"
-            onClick={() => setMode('wheel')}
+            onClick={() => { setDigits(secToDigits(hms.h * 3600 + hms.m * 60 + hms.s)); setMode('wheel'); }}
             aria-label="Switch to wheel picker"
           >
             <Icon name="caret-down" />
           </button>
         )}
-        {showPrev && <span className="time-prev-hint" title="Previous">{fmt(prev)}</span>}
       </div>
     );
   }
 
   // Mobile wheel mode
   return (
-    <div className="time-picker time-picker--wheel">
+    <div className="time-picker time-picker--wheel" style={wrapStyle}>
       <TimeWheel max={23} value={hms.h} onChange={(h) => commit({ ...hms, h })} label="hr" />
       <span className="time-wheel-sep">:</span>
       <TimeWheel max={59} value={hms.m} onChange={(m) => commit({ ...hms, m })} label="min" />
@@ -1034,67 +1064,97 @@ function TimePicker({ value, prev, onCommit }) {
       <button
         type="button"
         className="time-mode-toggle"
-        onClick={() => setMode('text')}
+        onClick={() => { setDigits(secToDigits(hms.h * 3600 + hms.m * 60 + hms.s)); setMode('text'); }}
         aria-label="Switch to keyboard input"
       >
         <Icon name="edit" />
       </button>
-      {showPrev && <span className="time-prev-hint" title="Previous">{fmt(prev)}</span>}
     </div>
   );
 }
 
 // A single vertical wheel column. Renders the full range (0..max) as
 // stacked cells in a scroll-snap container; the cell currently at the
-// vertical centre of the viewport is the selected value. Scrolling
-// snaps to whole rows, so the user's finger always lands on a number.
+// vertical centre of the viewport is the selected value.
+//
+// Smoothness rules learned the hard way:
+//  1. NEVER touch scrollTop while the user's finger / momentum is
+//     active — programmatic writes kill iOS momentum dead. We track
+//     interaction and suppress external sync until the wheel settles.
+//  2. Don't re-sync when the incoming `value` is the one this wheel
+//     just reported (the post-save session reload echoes it back).
+//  3. Prefer the native `scrollend` event to know when snapping is
+//     done; fall back to a quiet-period timer elsewhere.
 function TimeWheel({ max, value, onChange, label }) {
   const ref = useRef(null);
-  const ITEM_HEIGHT = 36;
+  const ITEM_HEIGHT = 32;
+  const interacting = useRef(false);   // finger down or momentum running
+  const lastSent = useRef(value);      // last value this wheel reported up
 
-  // Sync external value → scroll position. We must wait until the
-  // scroll container has actually rendered with non-zero height before
-  // setting scrollTop, otherwise the assignment becomes a no-op on iOS
-  // Safari. Use useLayoutEffect + a retry loop that bails once the
-  // element is measurable.
+  // Sync external value → scroll position, but only when (a) the value
+  // really came from outside and (b) the user isn't mid-scroll.
   useLayoutEffect(() => {
+    if (value === lastSent.current) return;   // our own echo — ignore
+    lastSent.current = value;
     let cancelled = false;
     const attempt = () => {
-      if (cancelled) return;
+      if (cancelled || interacting.current) return;
       const el = ref.current;
       if (!el) return;
       const target = value * ITEM_HEIGHT;
-      // If the element has 0 height, layout isn't ready — try again
-      // next frame.
-      if (el.clientHeight === 0) {
+      if (el.clientHeight === 0) {            // layout not ready (iOS)
         requestAnimationFrame(attempt);
         return;
       }
       el.scrollTop = target;
-      // Double-check the scroll actually landed (some browsers clamp
-      // to a different value if scroll content was just remounted)
-      requestAnimationFrame(() => {
-        if (cancelled) return;
-        if (ref.current && Math.abs(ref.current.scrollTop - target) > 1) {
-          ref.current.scrollTop = target;
-        }
-      });
     };
     attempt();
     return () => { cancelled = true; };
   }, [value]);
 
-  const timer = useRef(null);
-  const onScroll = () => {
+  // Initial position on mount (the effect above skips it because
+  // value === lastSent at mount time).
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      const idx = Math.round(el.scrollTop / ITEM_HEIGHT);
-      const clamped = Math.max(0, Math.min(max, idx));
-      if (clamped !== value) onChange(clamped);
-    }, 80);
+    const place = () => {
+      if (!ref.current) return;
+      if (ref.current.clientHeight === 0) { requestAnimationFrame(place); return; }
+      ref.current.scrollTop = value * ITEM_HEIGHT;
+    };
+    place();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const settleTimer = useRef(null);
+  const report = () => {
+    const el = ref.current;
+    if (!el) return;
+    interacting.current = false;
+    const idx = Math.round(el.scrollTop / ITEM_HEIGHT);
+    const clamped = Math.max(0, Math.min(max, idx));
+    if (clamped !== lastSent.current) {
+      lastSent.current = clamped;
+      onChange(clamped);
+    }
   };
+  const onScroll = () => {
+    interacting.current = true;
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    // Quiet-period fallback for browsers without `scrollend` (iOS <17).
+    settleTimer.current = setTimeout(report, 140);
+  };
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !('onscrollend' in el)) return undefined;
+    const onEnd = () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+      report();
+    };
+    el.addEventListener('scrollend', onEnd);
+    return () => el.removeEventListener('scrollend', onEnd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const items = [];
   for (let i = 0; i <= max; i++) items.push(i);
@@ -1105,6 +1165,7 @@ function TimeWheel({ max, value, onChange, label }) {
         ref={ref}
         className="time-wheel__list"
         onScroll={onScroll}
+        onTouchStart={() => { interacting.current = true; }}
       >
         {/* Top spacer so item 0 can sit at the centre row */}
         <div className="time-wheel__spacer" style={{ height: ITEM_HEIGHT }} />

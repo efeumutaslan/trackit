@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
@@ -30,15 +30,48 @@ function parseDurationLocal(s) {
   return null;
 }
 
+// Accent- and case-insensitive normalizer shared by all the pickers.
+const normalize = (s) =>
+  (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+// Serialize the editable state so dirty-checking is a string compare.
+function snapshot(name, color, exercises) {
+  return JSON.stringify({
+    name: name.trim(),
+    color,
+    exercises: exercises.map((e) => ({
+      exercise_id: e.exercise_id,
+      target_sets: e.target_sets,
+      target_reps: e.target_reps,
+      target_time_s: e.target_time_s ?? null,
+      target_mileage_m: e.target_mileage_m ?? null,
+      alt_exercise_id: e.alt_exercise_id ?? null,
+      superset_tag: e.superset_tag ?? '',
+      rest_seconds: e.rest_seconds ?? null,
+    })),
+  });
+}
+
 export default function TemplateEdit() {
   const { id } = useParams();
   const isNew = id === 'new';
   const nav = useNavigate();
   const [name, setName] = useState('');
   const [color, setColor] = useState(COLORS[0]);
-  const [exercises, setExercises] = useState([]); // [{exercise_id, exercise_name, target_sets, target_reps}]
+  const [exercises, setExercises] = useState([]);
   const [roster, setRoster] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [replaceIdx, setReplaceIdx] = useState(null); // index being replaced
+  const [showLeave, setShowLeave] = useState(false);  // Save / Discard prompt
+  const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
+
+  // The template id we are persisting to. For an existing template it's
+  // the route param; for a brand-new one it gets filled the moment
+  // auto-save creates the row.
+  const tmplIdRef = useRef(isNew ? null : +id);
+  // What's currently on the server (string snapshot). Dirty = differs.
+  const savedSnapRef = useRef(snapshot('', COLORS[0], []));
+  const loadedRef = useRef(false);
 
   useEffect(() => {
     api.get('/exercises').then(setRoster);
@@ -46,7 +79,7 @@ export default function TemplateEdit() {
       api.get(`/templates/${id}`).then((t) => {
         setName(t.name);
         setColor(t.color);
-        setExercises(t.exercises.map((e) => ({
+        const exs = t.exercises.map((e) => ({
           exercise_id: e.exercise_id,
           exercise_name: e.exercise_name,
           target_sets: e.target_sets,
@@ -56,41 +89,86 @@ export default function TemplateEdit() {
           alt_exercise_id:  e.alt_exercise_id  ?? null,
           superset_tag:     e.superset_tag     ?? '',
           rest_seconds:     e.rest_seconds     ?? null,
-        })));
+        }));
+        setExercises(exs);
+        savedSnapRef.current = snapshot(t.name, t.color, exs);
+        loadedRef.current = true;
       });
+    } else {
+      loadedRef.current = true;
     }
   }, [id, isNew]);
 
-  async function save() {
-    if (!name.trim()) { alert('Name is required'); return; }
-    const payload = {
-      name: name.trim(),
-      color,
-      exercises: exercises.map((e) => ({
-        exercise_id: e.exercise_id,
-        target_sets: e.target_sets,
-        target_reps: e.target_reps,
-        target_time_s: e.target_time_s ?? null,
-        target_mileage_m: e.target_mileage_m ?? null,
-        alt_exercise_id: e.alt_exercise_id ?? null,
-        superset_tag: e.superset_tag ?? '',
-        rest_seconds: e.rest_seconds ?? null,
-      })),
-    };
-    if (isNew) {
-      const t = await api.post('/templates', payload);
-      // update exercises after create
-      await api.put(`/templates/${t.id}`, payload);
-      nav('/templates');
-    } else {
-      await api.put(`/templates/${id}`, payload);
-      nav('/templates');
+  const currentSnap = useMemo(() => snapshot(name, color, exercises), [name, color, exercises]);
+  const dirty = loadedRef.current && currentSnap !== savedSnapRef.current;
+
+  const buildPayload = useCallback(() => ({
+    name: name.trim(),
+    color,
+    exercises: exercises.map((e) => ({
+      exercise_id: e.exercise_id,
+      target_sets: e.target_sets,
+      target_reps: e.target_reps,
+      target_time_s: e.target_time_s ?? null,
+      target_mileage_m: e.target_mileage_m ?? null,
+      alt_exercise_id: e.alt_exercise_id ?? null,
+      superset_tag: e.superset_tag ?? '',
+      rest_seconds: e.rest_seconds ?? null,
+    })),
+  }), [name, color, exercises]);
+
+  // Persist the current state. Creates the template on first save when
+  // the editor was opened as /templates/new.
+  const persist = useCallback(async () => {
+    if (!name.trim()) return false;       // can't save a nameless template
+    setSaveState('saving');
+    try {
+      const payload = buildPayload();
+      if (!tmplIdRef.current) {
+        const t = await api.post('/templates', payload);
+        tmplIdRef.current = t.id;
+        await api.put(`/templates/${t.id}`, payload);
+      } else {
+        await api.put(`/templates/${tmplIdRef.current}`, payload);
+      }
+      savedSnapRef.current = snapshot(name, color, exercises);
+      setSaveState('saved');
+      return true;
+    } catch (e) {
+      setSaveState('error');
+      return false;
     }
+  }, [name, color, exercises, buildPayload]);
+
+  // ── Auto-save ──
+  // Debounced: every edit schedules a save 800 ms out; rapid typing
+  // keeps pushing it back so we don't hammer the API per keystroke.
+  const persistRef = useRef(persist);
+  persistRef.current = persist;
+  useEffect(() => {
+    if (!dirty || !name.trim()) return undefined;
+    const t = setTimeout(() => { persistRef.current(); }, 800);
+    return () => clearTimeout(t);
+  }, [currentSnap, dirty, name]);
+
+  // Back navigation: if everything is saved just leave; if there are
+  // unsaved changes (autosave still pending, name missing, or a save
+  // failed) ask Save / Discard first.
+  function onBack() {
+    if (!dirty) { nav('/templates'); return; }
+    setShowLeave(true);
   }
+  async function leaveSave() {
+    const ok = await persistRef.current();
+    if (ok) nav('/templates');
+    else alert('Could not save — check the template name and your connection.');
+  }
+  function leaveDiscard() { nav('/templates'); }
 
   async function del() {
     if (!confirm('Delete this template? (Past sessions are unaffected)')) return;
-    await api.del(`/templates/${id}`);
+    if (tmplIdRef.current) await api.del(`/templates/${tmplIdRef.current}`);
+    savedSnapRef.current = currentSnap; // suppress the leave prompt
     nav('/templates');
   }
 
@@ -108,29 +186,64 @@ export default function TemplateEdit() {
   }
 
   function addExercise(ex) {
-    setExercises([...exercises, {
+    setExercises((cur) => [...cur, {
       exercise_id: ex.id,
       exercise_name: ex.name,
       target_sets:      ex.target_sets      ?? 3,
       target_reps:      ex.target_reps      ?? '',
       target_time_s:    ex.target_time_s    ?? null,
       target_mileage_m: ex.target_mileage_m ?? null,
+      alt_exercise_id:  null,
+      superset_tag:     '',
+      rest_seconds:     null,
     }]);
     setShowAdd(false);
   }
 
   async function createAndAdd(q, withTargets) {
     const created = await api.post('/exercises', { name: q.trim() });
-    setRoster([...roster, created]);
+    setRoster((r) => [...r, created]);
     addExercise({ ...created, ...(withTargets || {}) });
   }
+
+  // Replace the exercise at `idx` with another (existing or new) one,
+  // keeping targets / superset / rest exactly as they were.
+  function replaceExercise(idx, ex) {
+    setExercises((cur) => {
+      const next = [...cur];
+      next[idx] = {
+        ...next[idx],
+        exercise_id: ex.id,
+        exercise_name: ex.name,
+        // A self-referencing alternate makes no sense — drop it.
+        alt_exercise_id: next[idx].alt_exercise_id === ex.id ? null : next[idx].alt_exercise_id,
+      };
+      return next;
+    });
+    setReplaceIdx(null);
+  }
+
+  const saveBadge =
+    saveState === 'saving' ? 'Saving…'
+    : saveState === 'error' ? 'Save failed'
+    : dirty ? 'Unsaved'
+    : saveState === 'saved' ? 'Saved'
+    : '';
 
   return (
     <div className="app-shell page-template-edit">
       <TopBar
         back
+        onBack={onBack}
         title={isNew ? 'New template' : 'Edit template'}
-        right={!isNew && <button className="right-action" onClick={del} style={{ color: 'var(--red)' }}>Delete</button>}
+        right={
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            {saveBadge && (
+              <span className={`save-badge${saveState === 'error' ? ' save-badge--err' : ''}`}>{saveBadge}</span>
+            )}
+            {!isNew && <button className="right-action" onClick={del} style={{ color: 'var(--red)' }}>Delete</button>}
+          </span>
+        }
       />
       <div className="content">
         <div className="card">
@@ -168,6 +281,7 @@ export default function TemplateEdit() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <strong>{ex.exercise_name}</strong>
                 <div style={{ display: 'flex', gap: 4 }}>
+                  <button className="btn tiny ghost" onClick={() => setReplaceIdx(idx)} title="Replace exercise"><Icon name="swap" /></button>
                   <button className="btn tiny ghost" onClick={() => move(idx, -1)}><Icon name="arrow-up" /></button>
                   <button className="btn tiny ghost" onClick={() => move(idx, 1)}><Icon name="arrow-down" /></button>
                   <button className="btn tiny ghost" onClick={() => remove(idx)}><Icon name="xmark" /></button>
@@ -221,26 +335,27 @@ export default function TemplateEdit() {
                   />
                 </div>
               </div>
-              {/* A/B alternate — pre-pair an exercise here so the session
-                  can toggle to it without having to use Replace. */}
+              {/* A/B alternate — searchable picker; typing a name that
+                  doesn't exist yet offers to create it on the spot. */}
               <div className="field mt-1">
                 <label className="small text-muted">Alternate exercise (B) — optional</label>
-                <select
-                  value={ex.alt_exercise_id ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value;
+                <AltPicker
+                  roster={roster}
+                  excludeId={ex.exercise_id}
+                  value={ex.alt_exercise_id}
+                  onChange={(altId) => {
                     const next = [...exercises];
-                    next[idx] = { ...ex, alt_exercise_id: v === '' ? null : +v };
+                    next[idx] = { ...ex, alt_exercise_id: altId };
                     setExercises(next);
                   }}
-                >
-                  <option value="">— None —</option>
-                  {roster
-                    .filter((r) => r.id !== ex.exercise_id)
-                    .map((r) => (
-                      <option key={r.id} value={r.id}>{r.name}</option>
-                    ))}
-                </select>
+                  onCreate={async (newName) => {
+                    const created = await api.post('/exercises', { name: newName.trim() });
+                    setRoster((r) => [...r, created]);
+                    const next = [...exercises];
+                    next[idx] = { ...ex, alt_exercise_id: created.id };
+                    setExercises(next);
+                  }}
+                />
               </div>
               {/* Superset pre-grouping: any two rows sharing the same tag
                   (A, B, ...) will be visually merged inside the session.
@@ -279,7 +394,6 @@ export default function TemplateEdit() {
         )}
 
         <button className="btn" onClick={() => setShowAdd(true)}>+ Add exercise</button>
-        <button className="btn primary mt-2" onClick={save}>Save</button>
 
         {showAdd && (
           <AddExerciseModal
@@ -290,6 +404,131 @@ export default function TemplateEdit() {
             onClose={() => setShowAdd(false)}
           />
         )}
+
+        {replaceIdx != null && (
+          <ReplacePickModal
+            roster={roster}
+            currentExerciseId={exercises[replaceIdx]?.exercise_id}
+            onPick={(ex) => replaceExercise(replaceIdx, ex)}
+            onCreate={async (q) => {
+              const created = await api.post('/exercises', { name: q.trim() });
+              setRoster((r) => [...r, created]);
+              replaceExercise(replaceIdx, created);
+            }}
+            onClose={() => setReplaceIdx(null)}
+          />
+        )}
+
+        {showLeave && (
+          <div className="modal-bg" onClick={() => setShowLeave(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h3>Do you want to save changes?</h3>
+              <div className="small text-muted" style={{ marginBottom: 14 }}>
+                This template has unsaved changes.
+              </div>
+              <button className="btn primary" onClick={leaveSave}>Save</button>
+              <button className="btn ghost mt-1" onClick={leaveDiscard}>Discard</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Searchable A/B alternate picker. Shows the current pick with Change /
+// Remove; opening the search lists matches and offers "+ Create" when
+// the typed name doesn't exist yet.
+function AltPicker({ roster, excludeId, value, onChange, onCreate }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+
+  const current = roster.find((r) => r.id === value) || null;
+  const nq = normalize(q);
+  const filtered = roster
+    .filter((e) => e.id !== excludeId)
+    .filter((e) => normalize(e.name).includes(nq))
+    .slice(0, 8);
+  const exactMatch = roster.some((e) => normalize(e.name) === nq && nq !== '');
+
+  if (!open) {
+    return current ? (
+      <div className="row" style={{ alignItems: 'center' }}>
+        <div className="alt-current"><Icon name="dumbbell" /> {current.name}</div>
+        <button className="btn tiny ghost" onClick={() => { setQ(''); setOpen(true); }}>Change</button>
+        <button className="btn tiny ghost" onClick={() => onChange(null)}>Remove</button>
+      </div>
+    ) : (
+      <button className="btn ghost tiny" onClick={() => { setQ(''); setOpen(true); }}>+ Add an alternate</button>
+    );
+  }
+
+  return (
+    <div className="alt-picker">
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Search or type a new one…"
+        autoFocus
+      />
+      <div className="alt-picker__list">
+        {filtered.map((e) => (
+          <div key={e.id} className="alt-picker__row" onClick={() => { onChange(e.id); setOpen(false); setQ(''); }}>
+            <span><Icon name="dumbbell" /> {e.name}</span>
+            <span style={{ color: 'var(--gray)' }}>+</span>
+          </div>
+        ))}
+        {filtered.length === 0 && !q.trim() && (
+          <div className="small text-muted" style={{ padding: 8 }}>Type to search…</div>
+        )}
+        {q.trim() && !exactMatch && (
+          <div
+            className="alt-picker__row alt-picker__row--create"
+            onClick={async () => { await onCreate(q); setOpen(false); setQ(''); }}
+          >
+            <span><Icon name="plus" /> Create "{q.trim()}"</span>
+          </div>
+        )}
+        {filtered.length === 0 && q.trim() && exactMatch && (
+          <div className="small text-muted" style={{ padding: 8 }}>No matches</div>
+        )}
+      </div>
+      <button className="btn tiny ghost mt-1" onClick={() => { setOpen(false); setQ(''); }}>Cancel</button>
+    </div>
+  );
+}
+
+// Replace modal — pick an existing exercise (or create a new one) to
+// swap into the row, keeping sets/reps/superset/rest unchanged.
+function ReplacePickModal({ roster, currentExerciseId, onPick, onCreate, onClose }) {
+  const [q, setQ] = useState('');
+  const nq = normalize(q);
+  const filtered = roster
+    .filter((e) => e.id !== currentExerciseId)
+    .filter((e) => normalize(e.name).includes(nq));
+  const exactMatch = roster.some((e) => normalize(e.name) === nq && nq !== '');
+
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal modal--search" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-sticky">
+          <h3>Replace exercise</h3>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search or type a new one…" autoFocus />
+          </div>
+        </div>
+        <div className="modal-scroll">
+          {filtered.map((e) => (
+            <div className="list-row" key={e.id} onClick={() => onPick(e)}>
+              <div className="meta"><span><Icon name="dumbbell" /></span> {e.name}</div>
+              <span style={{ color: 'var(--gray)' }}><Icon name="swap" /></span>
+            </div>
+          ))}
+          {q.trim() && !exactMatch && (
+            <button className="btn primary mt-2" onClick={() => onCreate(q)}>+ Create "{q.trim()}" and replace</button>
+          )}
+        </div>
+        <button className="btn ghost mt-1" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );
@@ -302,13 +541,6 @@ function AddExerciseModal({ roster, existingIds, onAdd, onCreate, onClose }) {
   const [targetTime, setTargetTime] = useState('');
   const [targetMileage, setTargetMileage] = useState('');
 
-  // Accent- and case-insensitive search.
-  const normalize = (s) =>
-    (s || '')
-      .toString()
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
   const nq = normalize(q);
   const filtered = roster.filter(
     (e) => normalize(e.name).includes(nq) && !existingIds.includes(e.id)
@@ -319,25 +551,12 @@ function AddExerciseModal({ roster, existingIds, onAdd, onCreate, onClose }) {
   // the user create plain "kürek".
   const exactMatch = roster.some((e) => normalize(e.name) === nq && nq !== '');
 
-  function parseDuration(s) {
-    if (!s || !s.trim()) return null;
-    const txt = s.trim();
-    if (!txt.includes(':')) {
-      const n = parseInt(txt, 10);
-      return Number.isFinite(n) ? n : null;
-    }
-    const parts = txt.split(':').map((p) => parseInt(p, 10) || 0);
-    if (parts.length === 2) return parts[0] * 60 + parts[1];
-    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-    return null;
-  }
-
   function withTargets(e) {
     return {
       ...e,
       target_sets: targetSets,
       target_reps: targetReps,
-      target_time_s: parseDuration(targetTime),
+      target_time_s: parseDurationLocal(targetTime),
       target_mileage_m: targetMileage === '' ? null : (parseInt(targetMileage, 10) || null),
     };
   }
