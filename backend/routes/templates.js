@@ -5,6 +5,19 @@ import { authMiddleware } from '../auth.js';
 const router = Router();
 router.use(authMiddleware);
 
+// Reject any exercise reference (primary or alternate) that isn't owned
+// by the caller, so one user's template can't embed another's exercise.
+function ownsExercise(userId, exerciseId) {
+  if (exerciseId == null) return true;
+  return !!db.prepare('SELECT 1 FROM exercises WHERE id = ? AND user_id = ?').get(exerciseId, userId);
+}
+function validateExerciseOwnership(userId, exercises) {
+  if (!Array.isArray(exercises)) return true;
+  return exercises.every(
+    (ex) => ownsExercise(userId, ex.exercise_id) && ownsExercise(userId, ex.alt_exercise_id)
+  );
+}
+
 const PRESET_COLORS = [
   '#FFB07A', '#7AC4FF', '#9CD879', '#FF7A9C',
   '#C49CFF', '#FFD06B', '#5BC5C5', '#FF8C61',
@@ -59,6 +72,9 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   const { name, color, exercises } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
+  if (!validateExerciseOwnership(req.userId, exercises)) {
+    return res.status(403).json({ error: 'Exercise not found' });
+  }
   const finalColor = color && color.trim() ? color.trim() : pickUnusedColor(req.userId);
   const insertTmpl = db.prepare('INSERT INTO templates (user_id, name, color) VALUES (?, ?, ?)');
   const insertEx = db.prepare(
@@ -90,6 +106,9 @@ router.put('/:id', (req, res) => {
   const id = req.params.id;
   const t = db.prepare('SELECT * FROM templates WHERE id = ? AND user_id = ?').get(id, req.userId);
   if (!t) return res.status(404).json({ error: 'Not found' });
+  if (!validateExerciseOwnership(req.userId, exercises)) {
+    return res.status(403).json({ error: 'Exercise not found' });
+  }
   const txn = db.transaction(() => {
     db.prepare('UPDATE templates SET name = ?, color = ? WHERE id = ?')
       .run(name?.trim() || t.name, color || t.color, id);

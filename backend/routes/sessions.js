@@ -5,6 +5,18 @@ import { authMiddleware } from '../auth.js';
 const router = Router();
 router.use(authMiddleware);
 
+// Ownership guard for exercise references coming from the client. A
+// malicious / buggy client could send an exercise_id that belongs to
+// another user; without this check that exercise would attach to the
+// caller's session or template and leak its name. Returns true only if
+// the id is null/undefined (nothing to attach) or owned by this user.
+function ownsExercise(userId, exerciseId) {
+  if (exerciseId == null) return true;
+  const row = db.prepare('SELECT 1 FROM exercises WHERE id = ? AND user_id = ?')
+    .get(exerciseId, userId);
+  return !!row;
+}
+
 function getPrevWorkoutNotes(userId, templateId, beforeDate) {
   if (!templateId) return '';
   const row = db.prepare(`
@@ -285,6 +297,24 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   const { template_id, session_date, exercises, start_now, started_at } = req.body || {};
   const date = session_date || new Date().toISOString().slice(0, 10);
+
+  // If the client supplied exercises directly (rather than expanding a
+  // template server-side), every primary AND alternate id must belong
+  // to this user — otherwise another user's exercise would attach and
+  // leak its name.
+  if (Array.isArray(exercises)) {
+    for (const ex of exercises) {
+      if (!ownsExercise(req.userId, ex.exercise_id) || !ownsExercise(req.userId, ex.alt_exercise_id)) {
+        return res.status(403).json({ error: 'Exercise not found' });
+      }
+    }
+  }
+  // A supplied template must also belong to the caller.
+  if (template_id) {
+    const t = db.prepare('SELECT 1 FROM templates WHERE id = ? AND user_id = ?').get(template_id, req.userId);
+    if (!t) return res.status(403).json({ error: 'Template not found' });
+  }
+
   // Prefer client-provided started_at (correct timezone); fall back to start_now for compat
   const startedAt = started_at || (start_now ? new Date().toISOString() : null);
   const prevWN = getPrevWorkoutNotes(req.userId, template_id, date);
@@ -461,6 +491,9 @@ router.post('/:id/exercises', (req, res) => {
     target_time_s, target_mileage_m,
   } = req.body || {};
   if (!exercise_id) return res.status(400).json({ error: 'Select an exercise' });
+  if (!ownsExercise(req.userId, exercise_id)) {
+    return res.status(403).json({ error: 'Exercise not found' });
+  }
   const maxOrder = db.prepare('SELECT COALESCE(MAX(order_idx), -1) AS m FROM session_exercises WHERE session_id = ?').get(id).m;
   const prevNote = getPrevExerciseNotes(req.userId, exercise_id, cur.session_date);
   const info = db.prepare(`
@@ -503,6 +536,12 @@ router.put('/:id/exercises/:seId', (req, res) => {
     superset_tag, rest_seconds, target_time_s, target_mileage_m,
     alt_exercise_id, alt_active,
   } = req.body || {};
+
+  // A client may set/clear the alternate exercise here — make sure any
+  // non-null alt id belongs to this user before we store it.
+  if (alt_exercise_id !== undefined && !ownsExercise(req.userId, alt_exercise_id)) {
+    return res.status(403).json({ error: 'Exercise not found' });
+  }
 
   // notes/adjust apply to whichever side is currently active. When the
   // toggle flips, the caller still sends "exercise_notes" — we route it

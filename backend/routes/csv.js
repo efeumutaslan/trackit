@@ -30,6 +30,7 @@ router.get('/export', (req, res) => {
       t.name           AS template_name,
       t.color          AS template_color,
       e.name           AS exercise_name,
+      ea.name          AS alt_exercise_name,
       se.order_idx     AS exercise_order,
       se.target_sets,
       se.target_reps,
@@ -38,6 +39,9 @@ router.get('/export', (req, res) => {
       se.superset_tag,
       se.weight_adjust,
       se.exercise_notes,
+      se.alt_weight_adjust,
+      se.alt_exercise_notes,
+      ss.alt_active,
       ss.set_number,
       ss.weight_kg,
       ss.reps_done,
@@ -47,18 +51,19 @@ router.get('/export', (req, res) => {
     LEFT JOIN templates t          ON t.id = ws.template_id
     LEFT JOIN session_exercises se ON se.session_id = ws.id
     LEFT JOIN exercises e          ON e.id = se.exercise_id
+    LEFT JOIN exercises ea         ON ea.id = se.alt_exercise_id
     LEFT JOIN session_sets ss      ON ss.session_exercise_id = se.id
     WHERE ws.user_id = ?
-    ORDER BY ws.session_date, ws.id, se.order_idx, ss.set_number
+    ORDER BY ws.session_date, ws.id, se.order_idx, ss.alt_active, ss.set_number
   `).all(req.userId);
 
   const cols = [
     'session_date','started_at','finished_at','mood',
     'template_name','template_color',
-    'exercise_name','exercise_order','superset_tag','weight_adjust',
+    'exercise_name','alt_exercise_name','exercise_order','superset_tag','weight_adjust','alt_weight_adjust',
     'target_sets','target_reps','target_time_s','target_mileage_m',
-    'set_number','weight_kg','reps_done','time_seconds','mileage_m',
-    'exercise_notes','workout_notes'
+    'alt_active','set_number','weight_kg','reps_done','time_seconds','mileage_m',
+    'exercise_notes','alt_exercise_notes','workout_notes'
   ];
   let out = csvRow(cols);
   for (const r of rows) out += csvRow(cols.map((c) => r[c]));
@@ -148,6 +153,11 @@ router.post('/import', (req, res) => {
       const ssTag       = get('superset_tag') || '';
       const adj         = get('weight_adjust') || '';
       const exNotes     = get('exercise_notes') || '';
+      // A/B alternate columns (optional — absent in pre-v2.1 exports).
+      const altExName   = get('alt_exercise_name') || '';
+      const altNotes    = get('alt_exercise_notes') || '';
+      const altAdj      = get('alt_weight_adjust') || '';
+      const altActive   = (get('alt_active') === '1' || get('alt_active') === 'true') ? 1 : 0;
       const setNum      = +(get('set_number') || 1) || 1;
       const w           = parseFloat(get('weight_kg')); const wkg = Number.isFinite(w) ? w : null;
       const r           = parseInt(get('reps_done'), 10); const rps = Number.isFinite(r) ? r : null;
@@ -167,22 +177,35 @@ router.post('/import', (req, res) => {
       }
       if (!exName) continue;
       const exId = findOrCreateEx(exName);
+      const altExId = altExName ? findOrCreateEx(altExName) : null;
       const exKey = `${exId}|${exOrder}`;
       let seId = bucket.exMap.get(exKey);
       if (!seId) {
         const seInfo = db.prepare(`
           INSERT INTO session_exercises
             (session_id, exercise_id, order_idx, target_sets, target_reps, target_time_s,
-             target_mileage_m, exercise_notes, superset_tag, weight_adjust)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(bucket.sessionId, exId, exOrder, tgtSets, tgtReps, tgtTime, tgtMile, exNotes, ssTag, adj);
+             target_mileage_m, exercise_notes, superset_tag, weight_adjust,
+             alt_exercise_id, alt_exercise_notes, alt_weight_adjust)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(bucket.sessionId, exId, exOrder, tgtSets, tgtReps, tgtTime, tgtMile,
+               exNotes, ssTag, adj, altExId, altNotes || null, altAdj || null);
         seId = seInfo.lastInsertRowid;
         bucket.exMap.set(exKey, seId);
+      } else if (altExId) {
+        // A later row carried the alternate metadata — backfill it onto
+        // the SE created from the primary row (only if still empty).
+        db.prepare(`
+          UPDATE session_exercises
+          SET alt_exercise_id    = COALESCE(alt_exercise_id, ?),
+              alt_exercise_notes = COALESCE(NULLIF(alt_exercise_notes,''), ?),
+              alt_weight_adjust  = COALESCE(NULLIF(alt_weight_adjust,''),  ?)
+          WHERE id = ?
+        `).run(altExId, altNotes || null, altAdj || null, seId);
       }
       db.prepare(`
-        INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, reps_done, time_seconds, mileage_m)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(seId, setNum, wkg, rps, tsec, mm);
+        INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, reps_done, time_seconds, mileage_m, alt_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(seId, setNum, wkg, rps, tsec, mm, altActive);
       imported++;
     }
   });

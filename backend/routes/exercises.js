@@ -67,34 +67,57 @@ router.delete('/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// Last note for an exercise (from the most recent prior session)
+// Last note for an exercise (from the most recent prior session).
+// SIDE-AWARE: the note may live in exercise_notes (when this exercise
+// was the primary) or in alt_exercise_notes (when it was logged as the
+// alternate). We pick the most recent SE where this exercise appears in
+// either role and a note exists on the matching side.
 router.get('/:id/last-note', (req, res) => {
+  const id = +req.params.id;
   const row = db.prepare(`
-    SELECT se.exercise_notes AS notes, ws.session_date
+    SELECT
+      CASE WHEN se.exercise_id = @ex THEN se.exercise_notes
+           ELSE se.alt_exercise_notes END AS notes,
+      ws.session_date
     FROM session_exercises se
     JOIN workout_sessions ws ON ws.id = se.session_id
-    WHERE se.exercise_id = ? AND ws.user_id = ?
-      AND COALESCE(se.exercise_notes, '') != ''
+    WHERE ws.user_id = @user
+      AND (
+        (se.exercise_id = @ex     AND COALESCE(se.exercise_notes, '')     != '')
+        OR
+        (se.alt_exercise_id = @ex AND COALESCE(se.alt_exercise_notes, '') != '')
+      )
     ORDER BY ws.session_date DESC, ws.id DESC
     LIMIT 1
-  `).get(req.params.id, req.userId);
+  `).get({ user: req.userId, ex: id });
   res.json(row || { notes: '', session_date: null });
 });
 
-// Exercise progress: rep-tonnage by session
+// Exercise progress: rep-tonnage by session.
+// SIDE-AWARE: an exercise can appear as a session's PRIMARY
+// (se.exercise_id, sets with alt_active=0) or as the ALTERNATE
+// (se.alt_exercise_id, sets with alt_active=1). We must only sum the
+// sets logged on the side that actually matches this exercise — summing
+// both would blend an unrelated movement's tonnage into the chart, and
+// ignoring the alt role would drop every session where the user trained
+// this exercise as the alternate.
 router.get('/:id/progress', (req, res) => {
-  const id = req.params.id;
+  const id = +req.params.id;
   const rows = db.prepare(`
     SELECT ws.id AS session_id, ws.session_date,
            COALESCE(SUM(ss.weight_kg * ss.reps_done), 0) AS tonnage,
            COALESCE(MAX(ss.weight_kg), 0) AS top_weight
     FROM workout_sessions ws
     JOIN session_exercises se ON se.session_id = ws.id
-    LEFT JOIN session_sets ss ON ss.session_exercise_id = se.id
-    WHERE ws.user_id = ? AND se.exercise_id = ?
+    LEFT JOIN session_sets ss
+           ON ss.session_exercise_id = se.id
+          AND ss.alt_active = CASE WHEN se.exercise_id = @ex THEN 0 ELSE 1 END
+    WHERE ws.user_id = @user
+      AND (se.exercise_id = @ex OR se.alt_exercise_id = @ex)
     GROUP BY ws.id
+    HAVING tonnage > 0 OR top_weight > 0
     ORDER BY ws.session_date ASC, ws.id ASC
-  `).all(req.userId, id);
+  `).all({ user: req.userId, ex: id });
   res.json(rows);
 });
 
