@@ -8,10 +8,14 @@ import Icon from '../components/Icon.jsx';
 export default function Settings() {
   const [settings, setSettings] = useState(null);
   const [importStatus, setImportStatus] = useState('');
+  const [incInput, setIncInput] = useState('');
   const { logoutAll } = useAuth();
 
   useEffect(() => {
-    api.get('/settings').then(setSettings).catch(() => {});
+    api.get('/settings').then((s) => {
+      setSettings(s);
+      setIncInput(s?.weight_increment != null ? String(s.weight_increment) : '2.5');
+    }).catch(() => {});
   }, []);
 
   async function update(patch) {
@@ -93,6 +97,42 @@ export default function Settings() {
               className={`seg-btn${settings?.rep_placeholder_mode === 'previous' ? ' on' : ''}`}
               onClick={() => update({ rep_placeholder_mode: 'previous' })}
             >Show previous reps</button>
+          </div>
+        </div>
+
+        {/* ── Weight increment ─────────────────────────────────────────── */}
+        <div className="section-title">Weight increment</div>
+        <div className="card">
+          <div className="small text-muted mb-1">
+            How much the +/- buttons change the weight on each tap.
+          </div>
+          <div className="seg-group mb-1">
+            {[1.25, 2.5, 5].map((v) => (
+              <button
+                key={v}
+                className={`seg-btn${Number(settings?.weight_increment) === v ? ' on' : ''}`}
+                onClick={() => { setIncInput(String(v)); update({ weight_increment: v }); }}
+              >{v} kg</button>
+            ))}
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Custom step (kg)</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={incInput}
+              onChange={(e) => setIncInput(e.target.value.replace(/[^0-9.,]/g, ''))}
+              onBlur={() => {
+                const n = parseFloat(String(incInput).replace(',', '.'));
+                if (Number.isFinite(n) && n > 0 && n <= 100) {
+                  update({ weight_increment: n });
+                } else {
+                  // revert invalid entry to the stored value
+                  setIncInput(settings?.weight_increment != null ? String(settings.weight_increment) : '2.5');
+                }
+              }}
+              placeholder="2.5"
+            />
           </div>
         </div>
 

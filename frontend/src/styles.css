@@ -487,8 +487,8 @@ a { color: inherit; text-decoration: none; }
 }
 .exercise-head {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   margin-bottom: 8px;
 }
 .exercise-head h4 { margin: 0; font-size: 15px; font-weight: 700; }
@@ -652,7 +652,6 @@ a { color: inherit; text-decoration: none; }
    notes on the dark canvas. */
 .prev-note-card {
   background: var(--peach-soft);
-  border-left: 4px solid var(--peach-dark);
   border-radius: var(--radius-md);
   padding: 12px 14px;
   margin-bottom: 12px;
@@ -682,8 +681,9 @@ a { color: inherit; text-decoration: none; }
 .prev-note-date {
   margin-left: auto;
   font-size: 11px;
-  color: var(--ink-soft);
-  background: rgba(255,255,255,0.6);
+  color: #f6f8f1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid #b8e63d;
   padding: 2px 8px;
   border-radius: 999px;
 }
@@ -920,6 +920,35 @@ a { color: inherit; text-decoration: none; }
 .set-row input.has-target {
   border-color: var(--peach);
   background: var(--peach-bg);
+}
+
+/* When a card carries the previous-adjust tint (the user pressed the
+   green ▲ / red ▼ last time), the controls that aren't part of that
+   signal should stay neutral — they must read like the KG / Target-rep
+   boxes, not pick up the green/red wash. Placed AFTER .has-target so the
+   cascade neutralises the rep / kg inputs even when they have a target. */
+.exercise-block--prev-up .set-row input,
+.exercise-block--prev-down .set-row input,
+.exercise-block--prev-up .set-row input.has-target,
+.exercise-block--prev-down .set-row input.has-target {
+  background: var(--white);
+  border-color: var(--gray-soft);
+  color: var(--ink);
+}
+/* kg ± bumpers: neutral grey, not the peach accent. */
+.exercise-block--prev-up .kg-bump,
+.exercise-block--prev-down .kg-bump {
+  color: var(--ink-soft);
+}
+/* Ghost action buttons (move / replace / delete / Add-set / gear) read
+   grey so the tint doesn't bleed into them either. */
+.exercise-block--prev-up .exercise-head__actions .btn,
+.exercise-block--prev-down .exercise-head__actions .btn,
+.exercise-block--prev-up .exercise-head__bottom .btn,
+.exercise-block--prev-down .exercise-head__bottom .btn,
+.exercise-block--prev-up .btn.ghost,
+.exercise-block--prev-down .btn.ghost {
+  color: var(--ink-soft);
 }
 
 /* Superset badge in exercise head — same accent treatment as the rest

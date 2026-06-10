@@ -122,18 +122,28 @@ function getPrevExerciseNotes(userId, exerciseId, beforeDate) {
 // session. We find the most recent SE where the exercise appears in
 // EITHER role and the matching side actually has logged data, and
 // return { id, side } so callers can read exactly that side's sets.
-function findPrevLoggedSE(userId, exerciseId, templateId, beforeDate, excludeSessionId) {
+function findPrevLoggedSE(userId, exerciseId, templateId, beforeDate, excludeSessionId, dataCol) {
   const exclude = excludeSessionId || -1;
   // "side" = the alt_active value this exercise was logged under in
   // that SE: 0 when it was the primary, 1 when it was the alternate.
   const sideExpr = 'CASE WHEN se.exercise_id = @ex THEN 0 ELSE 1 END';
+  // By default "has data" means ANY tracked field is filled. When a
+  // specific column is requested (dataCol), we instead require THAT
+  // column to be non-null. This is what makes the per-field fallback
+  // work: if the user created a B-day session but only the prefilled kg
+  // is present and they never typed reps, the reps lookup skips that
+  // session and falls back to the last day where reps were actually
+  // entered (e.g. the A day). Same independently for kg / time / mileage.
+  const cond = dataCol
+    ? `ss.${dataCol} IS NOT NULL`
+    : `(ss.weight_kg IS NOT NULL OR ss.reps_done IS NOT NULL
+        OR ss.time_seconds IS NOT NULL OR ss.mileage_m IS NOT NULL)`;
   const hasData = `
     EXISTS (
       SELECT 1 FROM session_sets ss
       WHERE ss.session_exercise_id = se.id
         AND ss.alt_active = (${sideExpr})
-        AND (ss.weight_kg IS NOT NULL OR ss.reps_done IS NOT NULL
-             OR ss.time_seconds IS NOT NULL OR ss.mileage_m IS NOT NULL)
+        AND ${cond}
     )
   `;
   let found = null;
@@ -163,9 +173,11 @@ function findPrevLoggedSE(userId, exerciseId, templateId, beforeDate, excludeSes
 }
 
 // Shared column reader: returns the requested column for the side of
-// the SE that matched the exercise, ordered by set_number.
+// the SE that matched the exercise, ordered by set_number. The lookup
+// itself is scoped to sessions where THAT column has data, so an empty
+// (prefill-only) intermediate session doesn't shadow the last real one.
 function getPrevSetColumn(column, userId, exerciseId, templateId, beforeDate, excludeSessionId) {
-  const found = findPrevLoggedSE(userId, exerciseId, templateId, beforeDate, excludeSessionId);
+  const found = findPrevLoggedSE(userId, exerciseId, templateId, beforeDate, excludeSessionId, column);
   if (!found) return [];
   const rows = db.prepare(`
     SELECT ${column} AS v FROM session_sets
@@ -419,7 +431,7 @@ router.post('/', (req, res) => {
       const prevNote = getPrevExerciseNotesAndAdjust(req.userId, sideExId, date, null).notes;
       const seInfo = insSE.run(
         sid, ex.exercise_id, idx,
-        ex.target_sets || 3, ex.target_reps || '',
+        clampSets(ex.target_sets), ex.target_reps || '',
         ex.target_time_s || null, ex.target_mileage_m || null,
         prevNote, ex.alt_exercise_id || null,
         ex.superset_tag || '', ex.rest_seconds || null,
@@ -625,15 +637,11 @@ router.put('/:id/exercises/:seId', (req, res) => {
       const targetN = clampSets(target_sets ?? se.target_sets); // clamp the updated value
       const sideExerciseId = newAltActive === 1 ? se.alt_exercise_id : se.exercise_id;
       let prevWeights = [], prevTimes = [], prevMileages = [];
-      let prevNote = '', prevAdjust = '';
       if (sideExerciseId) {
         const wsRow = db.prepare('SELECT template_id, session_date FROM workout_sessions WHERE id = ?').get(id);
         prevWeights  = getPrevSetWeights (req.userId, sideExerciseId, wsRow.template_id || null, wsRow.session_date, id);
         prevTimes    = getPrevSetTimes   (req.userId, sideExerciseId, wsRow.template_id || null, wsRow.session_date, id);
         prevMileages = getPrevSetMileages(req.userId, sideExerciseId, wsRow.template_id || null, wsRow.session_date, id);
-        const noteAdj = getPrevExerciseNotesAndAdjust(req.userId, sideExerciseId, wsRow.session_date, id);
-        prevNote   = noteAdj.notes;
-        prevAdjust = noteAdj.adjust;
       }
       const ins = db.prepare(
         'INSERT INTO session_sets (session_exercise_id, set_number, weight_kg, time_seconds, mileage_m, alt_active) VALUES (?, ?, ?, ?, ?, ?)'
@@ -644,27 +652,13 @@ router.put('/:id/exercises/:seId', (req, res) => {
         const m = prevMileages[i - 1] != null ? prevMileages[i - 1] : null;
         ins.run(seId, i, w, t, m, newAltActive);
       }
-      // Also pre-fill the side's note + adjust columns if they are still
-      // blank. Only write into the side we just activated.
-      if (prevNote || prevAdjust) {
-        if (newAltActive === 1) {
-          // B side — fill alt_exercise_notes / alt_weight_adjust if empty
-          db.prepare(`
-            UPDATE session_exercises
-            SET alt_exercise_notes = COALESCE(NULLIF(alt_exercise_notes,''), ?),
-                alt_weight_adjust  = COALESCE(NULLIF(alt_weight_adjust,''),  ?)
-            WHERE id = ?
-          `).run(prevNote || null, prevAdjust || null, seId);
-        } else {
-          // A side
-          db.prepare(`
-            UPDATE session_exercises
-            SET exercise_notes = COALESCE(NULLIF(exercise_notes,''), ?),
-                weight_adjust  = COALESCE(NULLIF(weight_adjust,''),  ?)
-            WHERE id = ?
-          `).run(prevNote || null, prevAdjust || null, seId);
-        }
-      }
+      // NOTE: we deliberately do NOT copy the previous note/adjust into
+      // the real note columns here. The previous note is surfaced
+      // separately as the read-only "Previous exercise note" card
+      // (resolved side-aware in loadSession). Writing it into
+      // alt_exercise_notes / exercise_notes made the editable note field
+      // show a duplicate of the previous note as if the user had typed
+      // it, which is wrong — the field must start empty.
     }
   }
 

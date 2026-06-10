@@ -177,7 +177,6 @@ export default function Session() {
       <div className="content session-layout">
         <div
           className={`card session-meta${s.finished_at ? ' is-finished' : ''}`}
-          style={{ borderLeft: `4px solid ${s.template_color || '#FFB07A'}` }}
           data-region="meta"
         >
           <div className="field">
@@ -648,6 +647,7 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
             prevTime={Array.isArray(ex.prev_set_times) ? ex.prev_set_times[idx] : null}
             prevMileage={Array.isArray(ex.prev_set_mileages) ? ex.prev_set_mileages[idx] : null}
             repPlaceholderMode={settings?.rep_placeholder_mode || 'empty'}
+            weightIncrement={Number(settings?.weight_increment) > 0 ? Number(settings.weight_increment) : 2.5}
             onSaved={async (evt) => {
               if (evt && evt.kind === 'kg') {
                 // Cascade the new kg value down to later empty sets,
@@ -786,7 +786,7 @@ function AltExerciseInline({ sessionId, seId, currentExerciseId, currentAltId, c
   );
 }
 
-function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime, prevMileage, repPlaceholderMode }) {
+function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime, prevMileage, repPlaceholderMode, weightIncrement = 2.5 }) {
   // showCols = {kg, time, mileage, rep} — boolean. At least one is always true.
   // targets = optional { target_time_s, target_mileage_m } (from SE level) to
   // visually highlight cells that have a goal.
@@ -868,7 +868,7 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime
         <div className="set-num">{set.set_number}</div>
         {showCols?.kg && (
           <div className="set-kg-wrap">
-            <button className="kg-bump" onClick={() => bumpKg(-2.5)} title="-2.5 kg">−</button>
+            <button className="kg-bump" onClick={() => bumpKg(-weightIncrement)} title={`-${weightIncrement} kg`}>−</button>
             <input
               type="text"
               inputMode="decimal"
@@ -878,7 +878,7 @@ function SetRow({ sessionId, set, onSaved, showCols, targets, prevReps, prevTime
               onBlur={saveKg}
               placeholder="-"
             />
-            <button className="kg-bump" onClick={() => bumpKg(2.5)} title="+2.5 kg">+</button>
+            <button className="kg-bump" onClick={() => bumpKg(weightIncrement)} title={`+${weightIncrement} kg`}>+</button>
           </div>
         )}
         {showCols?.rep && (

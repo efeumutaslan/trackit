@@ -106,15 +106,6 @@ export default function Calendar({ initialYear, initialMonth } = {}) {
           );
         })}
       </div>
-      {sessions.length > 0 && (
-        <div className="calendar-legend">
-          <span>Less</span>
-          <span className="legend-box" style={{ opacity: 0.45 }} />
-          <span className="legend-box" style={{ opacity: 0.7 }} />
-          <span className="legend-box" style={{ opacity: 0.95 }} />
-          <span>More</span>
-        </div>
-      )}
       {picker && (
         <div className="modal-bg" onClick={() => setPicker(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>

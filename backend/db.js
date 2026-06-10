@@ -192,9 +192,13 @@ CREATE TABLE IF NOT EXISTS user_settings (
   rep_placeholder_mode TEXT NOT NULL DEFAULT 'empty',     -- 'empty' | 'previous'
   rest_timer_sound     INTEGER NOT NULL DEFAULT 1,        -- 0/1
   rest_timer_vibrate   INTEGER NOT NULL DEFAULT 1,
+  weight_increment     REAL NOT NULL DEFAULT 2.5,         -- kg step for the +/- bumpers
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 `);
+
+// Migration for existing DBs that predate weight_increment.
+addCol('user_settings', 'weight_increment', 'REAL NOT NULL DEFAULT 2.5');
 
 // Purge auth tokens older than 90 days on startup so the table doesn't
 // grow unbounded (authMiddleware also rejects them lazily per request,

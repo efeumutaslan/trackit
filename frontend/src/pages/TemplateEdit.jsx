@@ -141,15 +141,21 @@ export default function TemplateEdit() {
   }, [name, color, exercises, buildPayload]);
 
   // ── Auto-save ──
-  // Debounced: every edit schedules a save 800 ms out; rapid typing
-  // keeps pushing it back so we don't hammer the API per keystroke.
+  // Debounced autosave — ONLY for brand-new templates. While creating a
+  // template the first valid name triggers a create and subsequent edits
+  // are saved automatically. For an EXISTING template we deliberately do
+  // NOT autosave: changes are kept locally and only committed when the
+  // user confirms via the "Do you want to save changes?" prompt on back
+  // (or are discarded). This prevents half-finished edits to an
+  // established template from being persisted silently.
   const persistRef = useRef(persist);
   persistRef.current = persist;
   useEffect(() => {
+    if (!isNew) return undefined;            // existing templates: no autosave
     if (!dirty || !name.trim()) return undefined;
     const t = setTimeout(() => { persistRef.current(); }, 800);
     return () => clearTimeout(t);
-  }, [currentSnap, dirty, name]);
+  }, [currentSnap, dirty, name, isNew]);
 
   // Back navigation: if everything is saved just leave; if there are
   // unsaved changes (autosave still pending, name missing, or a save
