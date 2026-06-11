@@ -11,6 +11,27 @@ function fmtDate(iso) {
   return `${day}.${m}.${y}`;
 }
 
+// Date picker that ALWAYS displays dd.mm.yyyy regardless of the device
+// locale. A native <input type="date"> can't be reformatted (iOS shows
+// "11 Jun 2026"), so we lay a transparent native input over our own
+// dd.mm.yyyy text: tapping anywhere still opens the OS calendar, the
+// value stays a real date, but the visible label is always dd.mm.yyyy.
+function DateField({ value, onChange }) {
+  return (
+    <div className="date-field">
+      <span className="date-field__text">{fmtDate(value) || 'dd.mm.yyyy'}</span>
+      <Icon name="calendar" />
+      <input
+        type="date"
+        className="date-field__native"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Date"
+      />
+    </div>
+  );
+}
+
 function todayISO() {
   const d = new Date();
   const tz = d.getTimezoneOffset() * 60000;
@@ -56,7 +77,7 @@ export default function Bodyweight() {
           <div className="row mb-1">
             <div>
               <label className="small" style={{ color: 'var(--ink-soft)' }}>Date</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DateField value={date} onChange={setDate} />
             </div>
             <div>
               <label className="small" style={{ color: 'var(--ink-soft)' }}>Weight (kg)</label>
