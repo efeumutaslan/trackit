@@ -881,17 +881,17 @@ a { color: inherit; text-decoration: none; }
    6%-opacity tint was invisible — bumped to 18% plus a coloured 4px
    left stripe and a tinted border so the card unambiguously reads as
    "this one's going up" or "this one's going down". */
-.exercise-block.exercise-block--prev-up {
-  background: rgba(211, 255, 86, 0.10);
-  border-left: 4px solid var(--peach);
-  border-color: rgba(211, 255, 86, 0.35);
-}
+/* Previous up/down adjust: the coloured signal lives ONLY in the ▲▼
+   buttons (which keep their green/red look). The exercise card itself
+   stays neutral so the KG box, rep input, move arrows, gear and Add-set
+   all read grey — not sitting inside a green/red wash. Earlier versions
+   tinted the whole card + a coloured left stripe; that made every
+   control look green/red, which is exactly what we don't want. */
+.exercise-block.exercise-block--prev-up,
 .exercise-block.exercise-block--prev-down {
-  background: rgba(255, 107, 107, 0.10);
-  border-left: 4px solid var(--red);
-  border-color: rgba(255, 107, 107, 0.35);
+  /* no background tint, no coloured stripe — neutral like any other card */
 }
-/* Previous-note card inside a tinted exercise stays white so it's still readable */
+/* Previous-note card inside the exercise stays on its own surface */
 .exercise-block.exercise-block--prev-up .prev-note-card,
 .exercise-block.exercise-block--prev-down .prev-note-card {
   background: var(--white);
