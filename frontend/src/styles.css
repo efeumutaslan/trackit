@@ -1196,7 +1196,11 @@ a { color: inherit; text-decoration: none; }
   background: transparent;
   border: none;
   padding: 8px 10px;
-  border-radius: 6px;
+  /* The group has radius var(--radius-md) (16px) and 3px padding, so the
+     inner buttons need 16-3 = 13px to sit flush inside that curve. With
+     a plain 6px the selected fill's corners didn't follow the frame and
+     looked mismatched against the outer rounding. */
+  border-radius: 13px;
   font-weight: 600;
   font-size: 14px;
   color: var(--ink-soft);
