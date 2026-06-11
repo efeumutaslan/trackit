@@ -54,18 +54,12 @@ export default function Calendar({ initialYear, initialMonth } = {}) {
 
   const monthName = new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-  // GitHub-style density: opacity scales with workout count for that day
-  function densityStyle(list) {
+  // Always show the selected template's colour at full strength — the
+  // old GitHub-style opacity-by-count scaling is gone. Multiple workouts
+  // on a day are indicated by the count badge, not a brighter fill.
+  function dayStyle(list) {
     if (!list || list.length === 0) return null;
-    const n = list.length;
-    // Use the first session's template color as the base hue; blend others
-    const base = list[0]?.template_color || 'var(--peach)';
-    // 1 workout -> 0.55, 2 -> 0.75, 3+ -> 1.0 opacity feel via layering
-    const intensity = Math.min(1, 0.45 + n * 0.25);
-    return {
-      background: base,
-      opacity: intensity,
-    };
+    return { background: list[0]?.template_color || 'var(--peach)' };
   }
 
   return (
@@ -95,7 +89,7 @@ export default function Calendar({ initialYear, initialMonth } = {}) {
             <div
               key={i}
               className={`day${isToday ? ' today' : ''}${list.length ? ' has-session' : ''}${clickable ? ' clickable' : ''}`}
-              style={densityStyle(list)}
+              style={dayStyle(list)}
               title={names ? `${names} (${list.length})` : ''}
               onClick={onClick}
               role={clickable ? 'button' : undefined}

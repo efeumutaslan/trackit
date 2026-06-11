@@ -547,7 +547,7 @@ a { color: inherit; text-decoration: none; }
   grid-template-columns: 30px 1fr 1fr 30px;
   gap: 8px;
   align-items: center;
-  padding: 6px 0;
+  padding: 3px 0;
 }
 .set-row .set-num {
   font-weight: 700;
@@ -555,7 +555,7 @@ a { color: inherit; text-decoration: none; }
   text-align: center;
   font-size: 13px;
 }
-.set-row input { padding: 6px 8px; text-align: center; }
+.set-row input { padding: 5px 8px; text-align: center; }
 .set-row .del {
   font-size: 18px;
   color: var(--gray);
@@ -564,6 +564,14 @@ a { color: inherit; text-decoration: none; }
 .exercise-block {
   margin-bottom: 14px;
 }
+/* Expanded exercise cards were spending a lot of vertical room on
+   padding and gaps. Tighten the card padding and the internal blocks so
+   more of the set list fits on screen at once. */
+.card.exercise-block { padding: 12px; }
+.exercise-block .prev-note-card { margin-bottom: 8px; padding: 9px 11px; }
+.exercise-block .tonnage-line { padding: 6px 0; }
+.exercise-block .note-with-adjust { margin-top: 8px; }
+.exercise-block .row.mb-1 { margin-bottom: 6px; }
 .exercise-head {
   display: flex;
   flex-direction: column;
@@ -912,6 +920,29 @@ a { color: inherit; text-decoration: none; }
 }
 .adjust-btn:active { transform: scale(0.96); }
 
+/* Previous-session reminder: this exercise was bumped up/down last time.
+   We surface that on the button itself (a glowing ring) instead of
+   washing the whole card — so the indicator keeps its meaning while the
+   surrounding boxes stay neutral. If the user has also pressed it this
+   session, .pressed wins (it comes later / is more specific). */
+.adjust-btn.adjust-up.prev-hint {
+  box-shadow: 0 0 0 2px var(--peach), 0 0 8px rgba(211, 255, 86, 0.45);
+}
+.adjust-btn.adjust-down.prev-hint {
+  box-shadow: 0 0 0 2px var(--red), 0 0 8px rgba(255, 107, 107, 0.45);
+}
+/* A real press this session overrides the hint ring with the inset look. */
+.adjust-btn.adjust-up.prev-hint.pressed {
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.6),
+    inset 0 -1px 0 rgba(255,255,255,0.08);
+}
+.adjust-btn.adjust-down.prev-hint.pressed {
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.6),
+    inset 0 -1px 0 rgba(255,255,255,0.08);
+}
+
 /* ---------- Exercise card tinted from previous adjust ----------
    The prior session's ▲/▼ choice is shown as a clearly visible green
    or red tint on the next session's exercise card so the user
@@ -936,7 +967,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ── Set row 4-column layout (KG with quick-add, REP) plus optional TIME/DIST row ── */
-.set-row-wrap { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.set-row-wrap { display: flex; flex-direction: column; gap: 2px; margin-bottom: 3px; }
 .set-row-header {
   display: grid;
   grid-template-columns: 30px 1fr 1fr 30px;

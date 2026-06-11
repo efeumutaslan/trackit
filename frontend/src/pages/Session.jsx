@@ -691,14 +691,14 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
           {settings?.feat_weight_adjust !== 0 && (
             <div className="adjust-stack">
               <button
-                className={`adjust-btn adjust-up${adjust === 'up' ? ' pressed' : ''}`}
+                className={`adjust-btn adjust-up${adjust === 'up' ? ' pressed' : ''}${ex.prev_weight_adjust === 'up' ? ' prev-hint' : ''}`}
                 onClick={() => setAdjustValue('up')}
-                title="Plan to go heavier next time"
+                title={ex.prev_weight_adjust === 'up' ? 'Last time: go heavier' : 'Plan to go heavier next time'}
               ><Icon name="caret-up" /></button>
               <button
-                className={`adjust-btn adjust-down${adjust === 'down' ? ' pressed' : ''}`}
+                className={`adjust-btn adjust-down${adjust === 'down' ? ' pressed' : ''}${ex.prev_weight_adjust === 'down' ? ' prev-hint' : ''}`}
                 onClick={() => setAdjustValue('down')}
-                title="Plan to back off next time"
+                title={ex.prev_weight_adjust === 'down' ? 'Last time: back off' : 'Plan to back off next time'}
               ><Icon name="caret-down" /></button>
             </div>
           )}
