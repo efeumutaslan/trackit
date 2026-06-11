@@ -5,6 +5,7 @@ import Calendar from '../components/Calendar.jsx';
 import Heatmap from '../components/Heatmap.jsx';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import { useSettings } from '../lib/settings.jsx';
 import Icon from '../components/Icon.jsx';
 
 function fmtDate(iso) {
@@ -17,6 +18,7 @@ function fmtDate(iso) {
 
 export default function Home() {
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
   const nav = useNavigate();
   const [recent, setRecent] = useState([]);
   const [stats, setStats] = useState({ thisWeek: 0, totalSessions: 0, latestBw: null });
@@ -92,30 +94,34 @@ export default function Home() {
         {/* 2-column dashboard on desktop, stacked on mobile */}
         <div className="home-grid">
           <section className="home-grid__main">
-            <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>{view === 'month' ? 'Calendar' : 'Year heatmap'}</span>
-              <div className="view-toggle">
-                <button className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>Month</button>
-                <button className={view === 'year' ? 'on' : ''} onClick={() => setView('year')}>Year</button>
-              </div>
-            </div>
-            {view === 'month'
-              ? (
-                <Calendar
-                  key={pendingMonth ? `${pendingMonth.y}-${pendingMonth.m}` : 'default'}
-                  initialYear={pendingMonth?.y}
-                  initialMonth={pendingMonth?.m}
-                />
-              )
-              : (
-                <Heatmap
-                  onMonthClick={(y, m) => {
-                    setPendingMonth({ y, m });
-                    setView('month');
-                  }}
-                />
-              )
-            }
+            {settings?.feat_heatmap !== 0 && (
+              <>
+                <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>{view === 'month' ? 'Calendar' : 'Year heatmap'}</span>
+                  <div className="view-toggle">
+                    <button className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}>Month</button>
+                    <button className={view === 'year' ? 'on' : ''} onClick={() => setView('year')}>Year</button>
+                  </div>
+                </div>
+                {view === 'month'
+                  ? (
+                    <Calendar
+                      key={pendingMonth ? `${pendingMonth.y}-${pendingMonth.m}` : 'default'}
+                      initialYear={pendingMonth?.y}
+                      initialMonth={pendingMonth?.m}
+                    />
+                  )
+                  : (
+                    <Heatmap
+                      onMonthClick={(y, m) => {
+                        setPendingMonth({ y, m });
+                        setView('month');
+                      }}
+                    />
+                  )
+                }
+              </>
+            )}
           </section>
 
           <aside className="home-grid__side">

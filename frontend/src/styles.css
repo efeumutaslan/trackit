@@ -36,6 +36,38 @@
   --radius-xl: 28px;
 }
 
+/* ────────────────────────────────────────────────────────────────────
+   LIGHT THEME — opt-in via <html data-theme="light">.
+   Same variable names, light surfaces. The neon accent is kept for
+   brand identity but darkened (--peach-dark) for anything that needs to
+   read as text/icon on a white background; large fills still use the
+   bright --peach. Theme selection lives in Settings (Light/Dark/System);
+   "System" maps to one of these based on prefers-color-scheme and is
+   resolved in JS by setting data-theme to 'light' or 'dark'.
+   ──────────────────────────────────────────────────────────────────── */
+:root[data-theme="light"] {
+  --peach: #C2F03A;          /* slightly deeper so the fill isn't blinding on white */
+  --peach-dark: #6E9400;     /* readable green for text/icons on light surfaces */
+  --peach-soft: rgba(146, 196, 0, 0.16);
+  --peach-bg: #EEF6D6;       /* faint green-tinted block bg */
+
+  --cream: #F4F5F0;          /* page background */
+  --white: #FFFFFF;          /* cards / elevated surface */
+
+  --ink: #1B1C19;            /* primary text — near-black */
+  --ink-soft: #565752;       /* secondary text */
+  --gray: #8A8B85;           /* muted */
+  --gray-soft: #D9DAD2;      /* borders, dividers */
+  --gray-bg: #ECEDE6;        /* subtle inset background */
+
+  --green: #6E9400;          /* success reads on white */
+  --red:   #D64545;          /* destructive */
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.10);
+  --shadow-glow: 0 0 24px rgba(146, 196, 0, 0.22);
+}
+
 * { box-sizing: border-box; }
 
 html, body, #root {
@@ -690,11 +722,18 @@ a { color: inherit; text-decoration: none; }
 .prev-note-date {
   margin-left: auto;
   font-size: 11px;
-  color: #f6f8f1;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid #b8e63d;
+  color: var(--peach-dark);
+  background: var(--white);
+  border: 1px solid var(--peach-dark);
   padding: 2px 8px;
   border-radius: 999px;
+  font-weight: 700;
+}
+/* In dark mode keep the original bright-on-dark treatment. */
+:root[data-theme="dark"] .prev-note-date {
+  color: #f6f8f1;
+  background: rgba(255,255,255,0.06);
+  border-color: #b8e63d;
 }
 .prev-note-body {
   font-size: 14px;
@@ -2106,3 +2145,38 @@ a { color: inherit; text-decoration: none; }
   color: var(--peach-dark);
   font-weight: 700;
 }
+
+/* ── Settings: optional-feature rows with an iOS-style toggle ── */
+.feature-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.feature-row__text { flex: 1; min-width: 0; }
+.feature-row__label { font-weight: 600; }
+.switch {
+  flex-shrink: 0;
+  width: 46px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--gray-soft);
+  position: relative;
+  transition: background 0.18s ease;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+}
+.switch.on { background: var(--peach); }
+.switch__knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+  transition: transform 0.18s ease;
+}
+.switch.on .switch__knob { transform: translateX(18px); }

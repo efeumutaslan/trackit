@@ -4,6 +4,7 @@ import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 import Icon, { MOOD_ICON } from '../components/Icon.jsx';
 import { TimePicker } from '../components/TimePicker.jsx';
+import { useSettings } from '../lib/settings.jsx';
 
 function fmtTime(iso) {
   if (!iso) return '';
@@ -61,16 +62,10 @@ export default function Session() {
   const [restEnd, setRestEnd] = useState(null); // epoch ms when timer ends, or null
   const [restTotal, setRestTotal] = useState(0); // total seconds for progress bar
   const [, setTick] = useState(0); // forces a re-render each second while timer runs
-  // User-level preferences (sound, vibration, rep-input behaviour). Loaded
-  // once for the page; cached and passed down to every ExerciseBlock.
-  const [settings, setSettings] = useState({
-    rep_placeholder_mode: 'empty',
-    rest_timer_sound: 1,
-    rest_timer_vibrate: 1,
-  });
-  useEffect(() => {
-    api.get('/settings').then(setSettings).catch(() => {});
-  }, []);
+  // User-level preferences come from the app-wide settings context, so
+  // the optional-feature flags and rest-timer prefs stay consistent with
+  // Settings without a second fetch.
+  const { settings } = useSettings();
 
   const load = useCallback(() => {
     api.get(`/sessions/${id}`).then(setS).catch(() => nav('/sessions'));
@@ -108,6 +103,7 @@ export default function Session() {
   }, [restEnd, settings.rest_timer_sound, settings.rest_timer_vibrate]);
 
   function startRest(seconds) {
+    if (settings?.feat_rest_timer === 0) return; // feature disabled
     if (!seconds || seconds <= 0) return;
     setRestTotal(seconds);
     setRestEnd(Date.now() + seconds * 1000);
@@ -248,7 +244,7 @@ export default function Session() {
           </div>
         </div>
 
-        {s.prev_workout_notes && (
+        {settings?.feat_prev_note !== 0 && s.prev_workout_notes && (
           <div className="prev-note-card" data-region="prev-note">
             <div className="prev-note-head">
               <span className="prev-note-icon"><Icon name="scroll" /></span>
@@ -525,7 +521,7 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
       {/* Body — hidden when card is collapsed (CSS handles it) */}
       <div className="exercise-body">
         {/* Previous exercise note — placed right below the exercise name */}
-        {ex.prev_exercise_notes && (
+        {settings?.feat_prev_note !== 0 && ex.prev_exercise_notes && (
           <div className="prev-note-card prev-note-card--sm" style={{ marginBottom: 10 }}>
             <div className="prev-note-head">
               <span className="prev-note-icon"><Icon name="scroll" /></span>
@@ -548,15 +544,17 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
               placeholder="e.g. 6-10"
             />
           </div>
-          <div>
-            <label className="small" style={{ color: 'var(--ink-soft)' }}>Tonnage</label>
-            <div className="tonnage-line" style={{ padding: '10px 0' }}>
-              <span className="tag">{ex.tonnage.toFixed(1)} kg</span>
-              {ex.prev_tonnage > 0 && (
-                <span className="tag muted">Previous: {ex.prev_tonnage.toFixed(1)}</span>
-              )}
+          {settings?.feat_tonnage !== 0 && (
+            <div>
+              <label className="small" style={{ color: 'var(--ink-soft)' }}>Tonnage</label>
+              <div className="tonnage-line" style={{ padding: '10px 0' }}>
+                <span className="tag">{ex.tonnage.toFixed(1)} kg</span>
+                {ex.prev_tonnage > 0 && (
+                  <span className="tag muted">Previous: {ex.prev_tonnage.toFixed(1)}</span>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Targets panel — collapsed by default; opens with ⚙ */}
@@ -690,18 +688,20 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
             onBlur={() => saveMeta()}
             placeholder="Note about this exercise…"
           />
-          <div className="adjust-stack">
-            <button
-              className={`adjust-btn adjust-up${adjust === 'up' ? ' pressed' : ''}`}
-              onClick={() => setAdjustValue('up')}
-              title="Plan to go heavier next time"
-            ><Icon name="caret-up" /></button>
-            <button
-              className={`adjust-btn adjust-down${adjust === 'down' ? ' pressed' : ''}`}
-              onClick={() => setAdjustValue('down')}
-              title="Plan to back off next time"
-            ><Icon name="caret-down" /></button>
-          </div>
+          {settings?.feat_weight_adjust !== 0 && (
+            <div className="adjust-stack">
+              <button
+                className={`adjust-btn adjust-up${adjust === 'up' ? ' pressed' : ''}`}
+                onClick={() => setAdjustValue('up')}
+                title="Plan to go heavier next time"
+              ><Icon name="caret-up" /></button>
+              <button
+                className={`adjust-btn adjust-down${adjust === 'down' ? ' pressed' : ''}`}
+                onClick={() => setAdjustValue('down')}
+                title="Plan to back off next time"
+              ><Icon name="caret-down" /></button>
+            </div>
+          )}
         </div>
       </div>
 

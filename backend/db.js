@@ -193,12 +193,27 @@ CREATE TABLE IF NOT EXISTS user_settings (
   rest_timer_sound     INTEGER NOT NULL DEFAULT 1,        -- 0/1
   rest_timer_vibrate   INTEGER NOT NULL DEFAULT 1,
   weight_increment     REAL NOT NULL DEFAULT 2.5,         -- kg step for the +/- bumpers
+  theme                TEXT NOT NULL DEFAULT 'system',    -- 'system' | 'dark' | 'light'
+  feat_rest_timer      INTEGER NOT NULL DEFAULT 1,        -- show the rest timer
+  feat_bodyweight      INTEGER NOT NULL DEFAULT 1,        -- show the Bodyweight page/nav
+  feat_weight_adjust   INTEGER NOT NULL DEFAULT 1,        -- show the ▲▼ adjust buttons
+  feat_prev_note       INTEGER NOT NULL DEFAULT 1,        -- show the previous-exercise-note card
+  feat_tonnage         INTEGER NOT NULL DEFAULT 1,        -- show the per-exercise tonnage
+  feat_heatmap         INTEGER NOT NULL DEFAULT 1,        -- show the home calendar/heatmap
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 `);
 
 // Migration for existing DBs that predate weight_increment.
 addCol('user_settings', 'weight_increment', 'REAL NOT NULL DEFAULT 2.5');
+// Theme + optional-feature toggles (added in the Settings overhaul).
+addCol('user_settings', 'theme',              "TEXT NOT NULL DEFAULT 'system'");
+addCol('user_settings', 'feat_rest_timer',    'INTEGER NOT NULL DEFAULT 1');
+addCol('user_settings', 'feat_bodyweight',    'INTEGER NOT NULL DEFAULT 1');
+addCol('user_settings', 'feat_weight_adjust', 'INTEGER NOT NULL DEFAULT 1');
+addCol('user_settings', 'feat_prev_note',     'INTEGER NOT NULL DEFAULT 1');
+addCol('user_settings', 'feat_tonnage',       'INTEGER NOT NULL DEFAULT 1');
+addCol('user_settings', 'feat_heatmap',       'INTEGER NOT NULL DEFAULT 1');
 
 // Purge auth tokens older than 90 days on startup so the table doesn't
 // grow unbounded (authMiddleware also rejects them lazily per request,

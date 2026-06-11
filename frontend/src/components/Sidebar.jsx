@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
+import { useSettings } from '../lib/settings.jsx';
 import Icon from './Icon.jsx';
 import Logo from './Logo.jsx';
 
@@ -8,6 +9,7 @@ import Logo from './Logo.jsx';
 // desktop users.
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
   const nav = useNavigate();
 
   return (
@@ -33,10 +35,12 @@ export default function Sidebar() {
           <span className="icon"><Icon name="dumbbell" fw /></span>
           <span>Exercises</span>
         </NavLink>
-        <NavLink to="/bodyweight">
-          <span className="icon"><Icon name="scale" fw /></span>
-          <span>Body</span>
-        </NavLink>
+        {settings?.feat_bodyweight !== 0 && (
+          <NavLink to="/bodyweight">
+            <span className="icon"><Icon name="scale" fw /></span>
+            <span>Body</span>
+          </NavLink>
+        )}
         <NavLink to="/settings">
           <span className="icon"><Icon name="gear" fw /></span>
           <span>Settings</span>

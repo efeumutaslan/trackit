@@ -1,27 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
+import { useSettings } from '../lib/settings.jsx';
 import Icon from '../components/Icon.jsx';
 
 export default function Settings() {
-  const [settings, setSettings] = useState(null);
+  const { settings, update } = useSettings();
   const [importStatus, setImportStatus] = useState('');
-  const [incInput, setIncInput] = useState('');
+  const [incInput, setIncInput] = useState(
+    settings?.weight_increment != null ? String(settings.weight_increment) : '2.5'
+  );
   const { logoutAll } = useAuth();
-
-  useEffect(() => {
-    api.get('/settings').then((s) => {
-      setSettings(s);
-      setIncInput(s?.weight_increment != null ? String(s.weight_increment) : '2.5');
-    }).catch(() => {});
-  }, []);
-
-  async function update(patch) {
-    const next = await api.put('/settings', { ...settings, ...patch });
-    setSettings(next);
-  }
 
   async function exportCsv() {
     const token = localStorage.getItem('trackit_token');
@@ -60,14 +51,23 @@ export default function Settings() {
     await logoutAll();
   }
 
+  // The optional features, with the settings key + label shown in the UI.
+  const FEATURES = [
+    { key: 'feat_rest_timer',    label: 'Rest timer',           desc: 'Countdown timer between sets.' },
+    { key: 'feat_bodyweight',    label: 'Bodyweight tracking',  desc: 'The Body tab for logging your weight.' },
+    { key: 'feat_weight_adjust', label: 'Weight ▲▼ indicator',  desc: 'The go-heavier / back-off buttons on each exercise.' },
+    { key: 'feat_prev_note',     label: 'Previous exercise note', desc: 'The card recalling last session\u2019s note.' },
+    { key: 'feat_tonnage',       label: 'Tonnage',              desc: 'Total volume (kg\u00d7reps) shown per exercise.' },
+    { key: 'feat_heatmap',       label: 'Home calendar',        desc: 'The activity calendar / heatmap on the home screen.' },
+  ];
+
+  const isOn = (k) => settings?.[k] === 1 || settings?.[k] === true;
+
   return (
     <div className="app-shell page-settings">
       <TopBar back title="Settings" />
       <div className="content">
-        {/* ── Library — Templates / Exercises moved here from the bottom nav
-              so the nav can stay slim. These are still full-fledged pages
-              with their own URLs (/templates, /exercises) — this is just
-              the entry point. ──────────────────────────────────────────── */}
+        {/* ── Library ──────────────────────────────────────────────────── */}
         <div className="section-title">Library</div>
         <div className="card" style={{ padding: 0 }}>
           <Link to="/templates" className="settings-link-row">
@@ -80,6 +80,52 @@ export default function Settings() {
             <span className="settings-link-row__label">Exercises</span>
             <span className="settings-link-row__chev"><Icon name="chevron-right" /></span>
           </Link>
+        </div>
+
+        {/* ── Appearance / theme ───────────────────────────────────────── */}
+        <div className="section-title">Appearance</div>
+        <div className="card">
+          <div className="small text-muted mb-1">
+            Choose the look. “System” follows your device’s light/dark setting.
+          </div>
+          <div className="seg-group">
+            {[
+              { v: 'system', label: 'System' },
+              { v: 'light',  label: 'Light' },
+              { v: 'dark',   label: 'Dark' },
+            ].map((o) => (
+              <button
+                key={o.v}
+                className={`seg-btn${settings?.theme === o.v ? ' on' : ''}`}
+                onClick={() => update({ theme: o.v })}
+              >{o.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Optional features ────────────────────────────────────────── */}
+        <div className="section-title">Features</div>
+        <div className="card" style={{ padding: 0 }}>
+          {FEATURES.map((f, i) => (
+            <div
+              key={f.key}
+              className="feature-row"
+              style={i < FEATURES.length - 1 ? { borderBottom: '1px solid var(--gray-soft)' } : undefined}
+            >
+              <div className="feature-row__text">
+                <div className="feature-row__label">{f.label}</div>
+                <div className="small text-muted">{f.desc}</div>
+              </div>
+              <button
+                role="switch"
+                aria-checked={isOn(f.key)}
+                className={`switch${isOn(f.key) ? ' on' : ''}`}
+                onClick={() => update({ [f.key]: !isOn(f.key) })}
+              >
+                <span className="switch__knob" />
+              </button>
+            </div>
+          ))}
         </div>
 
         {/* ── Rep input placeholder ────────────────────────────────────── */}
@@ -127,7 +173,6 @@ export default function Settings() {
                 if (Number.isFinite(n) && n > 0 && n <= 100) {
                   update({ weight_increment: n });
                 } else {
-                  // revert invalid entry to the stored value
                   setIncInput(settings?.weight_increment != null ? String(settings.weight_increment) : '2.5');
                 }
               }}
@@ -136,36 +181,40 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* ── Rest timer ───────────────────────────────────────────────── */}
-        <div className="section-title">Rest timer</div>
-        <div className="card">
-          <div className="field" style={{ marginBottom: 14 }}>
-            <label>Sound</label>
-            <div className="seg-group">
-              <button
-                className={`seg-btn${settings?.rest_timer_sound ? ' on' : ''}`}
-                onClick={() => update({ rest_timer_sound: true })}
-              >On</button>
-              <button
-                className={`seg-btn${!settings?.rest_timer_sound ? ' on' : ''}`}
-                onClick={() => update({ rest_timer_sound: false })}
-              >Off</button>
+        {/* ── Rest timer (only relevant when the feature is on) ─────────── */}
+        {isOn('feat_rest_timer') && (
+          <>
+            <div className="section-title">Rest timer</div>
+            <div className="card">
+              <div className="field" style={{ marginBottom: 14 }}>
+                <label>Sound</label>
+                <div className="seg-group">
+                  <button
+                    className={`seg-btn${settings?.rest_timer_sound ? ' on' : ''}`}
+                    onClick={() => update({ rest_timer_sound: true })}
+                  >On</button>
+                  <button
+                    className={`seg-btn${!settings?.rest_timer_sound ? ' on' : ''}`}
+                    onClick={() => update({ rest_timer_sound: false })}
+                  >Off</button>
+                </div>
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Vibration</label>
+                <div className="seg-group">
+                  <button
+                    className={`seg-btn${settings?.rest_timer_vibrate ? ' on' : ''}`}
+                    onClick={() => update({ rest_timer_vibrate: true })}
+                  >On</button>
+                  <button
+                    className={`seg-btn${!settings?.rest_timer_vibrate ? ' on' : ''}`}
+                    onClick={() => update({ rest_timer_vibrate: false })}
+                  >Off</button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Vibration</label>
-            <div className="seg-group">
-              <button
-                className={`seg-btn${settings?.rest_timer_vibrate ? ' on' : ''}`}
-                onClick={() => update({ rest_timer_vibrate: true })}
-              >On</button>
-              <button
-                className={`seg-btn${!settings?.rest_timer_vibrate ? ' on' : ''}`}
-                onClick={() => update({ rest_timer_vibrate: false })}
-              >Off</button>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
 
         {/* ── Data ─────────────────────────────────────────────────────── */}
         <div className="section-title">Data</div>

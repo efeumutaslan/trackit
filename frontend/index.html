@@ -23,6 +23,24 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Apply the saved theme BEFORE the app renders, so there's no flash
+      // of the wrong palette. Mirrors lib/theme.js (kept tiny + inline on
+      // purpose). 'system' resolves against the OS preference.
+      (function () {
+        try {
+          var pref = localStorage.getItem('trackit_theme');
+          if (['system', 'dark', 'light'].indexOf(pref) === -1) pref = 'system';
+          var dark = pref === 'dark'
+            || (pref === 'system'
+                && window.matchMedia
+                && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
     <script>
       // Register the service worker once the page is loaded. Failures are

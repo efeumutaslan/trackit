@@ -18,12 +18,20 @@ router.get('/', (req, res) => {
 router.put('/', (req, res) => {
   ensureRow(req.userId);
   const cur = db.prepare('SELECT * FROM user_settings WHERE user_id = ?').get(req.userId);
-  const { rep_placeholder_mode, rest_timer_sound, rest_timer_vibrate, weight_increment } = req.body || {};
+  const {
+    rep_placeholder_mode, rest_timer_sound, rest_timer_vibrate, weight_increment,
+    theme,
+    feat_rest_timer, feat_bodyweight, feat_weight_adjust,
+    feat_prev_note, feat_tonnage, feat_heatmap,
+  } = req.body || {};
 
   // Whitelist string values
   const mode = rep_placeholder_mode === 'previous' ? 'previous'
              : rep_placeholder_mode === 'empty' ? 'empty'
              : cur.rep_placeholder_mode;
+
+  // Theme: only three valid values; anything else keeps the current one.
+  const themeVal = ['system', 'dark', 'light'].includes(theme) ? theme : cur.theme;
 
   // Weight increment: a positive number, capped to a sane range so the
   // bumpers stay usable. Falls back to the current value when omitted or
@@ -34,18 +42,35 @@ router.put('/', (req, res) => {
     if (Number.isFinite(n) && n > 0 && n <= 100) inc = n;
   }
 
+  // Optional-feature flags: undefined → unchanged, otherwise coerce to 0/1.
+  const flag = (v, curv) => (v === undefined ? curv : (v ? 1 : 0));
+
   db.prepare(`
     UPDATE user_settings
        SET rep_placeholder_mode = ?,
            rest_timer_sound     = ?,
            rest_timer_vibrate   = ?,
-           weight_increment     = ?
+           weight_increment     = ?,
+           theme                = ?,
+           feat_rest_timer      = ?,
+           feat_bodyweight      = ?,
+           feat_weight_adjust   = ?,
+           feat_prev_note       = ?,
+           feat_tonnage         = ?,
+           feat_heatmap         = ?
      WHERE user_id = ?
   `).run(
     mode,
     rest_timer_sound   === undefined ? cur.rest_timer_sound   : (rest_timer_sound   ? 1 : 0),
     rest_timer_vibrate === undefined ? cur.rest_timer_vibrate : (rest_timer_vibrate ? 1 : 0),
     inc,
+    themeVal,
+    flag(feat_rest_timer,    cur.feat_rest_timer),
+    flag(feat_bodyweight,    cur.feat_bodyweight),
+    flag(feat_weight_adjust, cur.feat_weight_adjust),
+    flag(feat_prev_note,     cur.feat_prev_note),
+    flag(feat_tonnage,       cur.feat_tonnage),
+    flag(feat_heatmap,       cur.feat_heatmap),
     req.userId
   );
   res.json(db.prepare('SELECT * FROM user_settings WHERE user_id = ?').get(req.userId));
