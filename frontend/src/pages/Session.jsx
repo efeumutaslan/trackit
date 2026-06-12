@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 import Icon, { MOOD_ICON } from '../components/Icon.jsx';
+import DateField from '../components/DateField.jsx';
 import { TimePicker } from '../components/TimePicker.jsx';
 import { useSettings } from '../lib/settings.jsx';
 
@@ -177,10 +178,9 @@ export default function Session() {
         >
           <div className="field">
             <label>Date</label>
-            <input
-              type="date"
+            <DateField
               value={s.session_date}
-              onChange={(e) => saveMeta({ session_date: e.target.value })}
+              onChange={(v) => saveMeta({ session_date: v })}
             />
           </div>
 

@@ -19,9 +19,10 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, notes, group_id } = req.body || {};
+  const { name, notes, group_id, kind } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
   const cleanName = name.trim();
+  const cleanKind = kind === 'cardio' ? 'cardio' : 'strength';
   try {
     // FIX: resurrect an archived exercise with the same name instead of
     // failing UNIQUE(user_id, name) — same pattern as groups.js
@@ -29,15 +30,16 @@ router.post('/', (req, res) => {
       .prepare('SELECT * FROM exercises WHERE user_id = ? AND name = ? AND archived = 1')
       .get(req.userId, cleanName);
     if (archived) {
-      db.prepare('UPDATE exercises SET archived = 0, notes = ?, group_id = ? WHERE id = ?')
+      db.prepare('UPDATE exercises SET archived = 0, notes = ?, group_id = ?, kind = ? WHERE id = ?')
         .run(notes || archived.notes,
              group_id !== undefined ? group_id : archived.group_id,
+             cleanKind,
              archived.id);
       return res.json(db.prepare('SELECT * FROM exercises WHERE id = ?').get(archived.id));
     }
     const info = db
-      .prepare('INSERT INTO exercises (user_id, name, notes, group_id) VALUES (?, ?, ?, ?)')
-      .run(req.userId, cleanName, notes || '', group_id || null);
+      .prepare('INSERT INTO exercises (user_id, name, notes, group_id, kind) VALUES (?, ?, ?, ?, ?)')
+      .run(req.userId, cleanName, notes || '', group_id || null, cleanKind);
     const row = db.prepare('SELECT * FROM exercises WHERE id = ?').get(info.lastInsertRowid);
     res.json(row);
   } catch (e) {
@@ -49,13 +51,14 @@ router.post('/', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
-  const { name, notes, group_id } = req.body || {};
+  const { name, notes, group_id, kind } = req.body || {};
   const id = req.params.id;
   const ex = db.prepare('SELECT * FROM exercises WHERE id = ? AND user_id = ?').get(id, req.userId);
   if (!ex) return res.status(404).json({ error: 'Not found' });
-  db.prepare('UPDATE exercises SET name = ?, notes = ?, group_id = ? WHERE id = ?')
+  const cleanKind = kind === undefined ? ex.kind : (kind === 'cardio' ? 'cardio' : 'strength');
+  db.prepare('UPDATE exercises SET name = ?, notes = ?, group_id = ?, kind = ? WHERE id = ?')
     .run(name?.trim() || ex.name, notes ?? ex.notes,
-         group_id !== undefined ? group_id : ex.group_id, id);
+         group_id !== undefined ? group_id : ex.group_id, cleanKind, id);
   res.json(db.prepare('SELECT * FROM exercises WHERE id = ?').get(id));
 });
 

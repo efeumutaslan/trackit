@@ -2,35 +2,7 @@ import { useEffect, useState } from 'react';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
-
-function fmtDate(iso) {
-  if (!iso) return '';
-  const d = String(iso).slice(0, 10);
-  const [y, m, day] = d.split('-');
-  if (!y || !m || !day) return iso;
-  return `${day}.${m}.${y}`;
-}
-
-// Date picker that ALWAYS displays dd.mm.yyyy regardless of the device
-// locale. A native <input type="date"> can't be reformatted (iOS shows
-// "11 Jun 2026"), so we lay a transparent native input over our own
-// dd.mm.yyyy text: tapping anywhere still opens the OS calendar, the
-// value stays a real date, but the visible label is always dd.mm.yyyy.
-function DateField({ value, onChange }) {
-  return (
-    <div className="date-field">
-      <span className="date-field__text">{fmtDate(value) || 'dd.mm.yyyy'}</span>
-      <Icon name="calendar" />
-      <input
-        type="date"
-        className="date-field__native"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label="Date"
-      />
-    </div>
-  );
-}
+import DateField, { fmtDate } from '../components/DateField.jsx';
 
 function todayISO() {
   const d = new Date();
@@ -100,23 +72,32 @@ export default function Bodyweight() {
         {chartData.length >= 2 && (
           <div className="card mt-2">
             <div className="section-title" style={{ marginTop: 0 }}>Trend</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 90 }}>
-              {chartData.map((r) => {
-                const h = 6 + 80 * ((r.weight_kg - min) / range);
-                return (
-                  <div
-                    key={r.id}
-                    style={{
-                      flex: 1,
-                      height: h,
-                      background: 'var(--peach)',
-                      borderRadius: 3,
-                    }}
-                    title={`${fmtDate(r.log_date)}: ${r.weight_kg} kg`}
-                  />
-                );
-              })}
-            </div>
+            {(() => {
+              // A line/area chart is the honest way to show weight: bars
+              // from zero exaggerated tiny changes into dramatic drops.
+              // We pad the y-range a little above/below the data so the
+              // line sits in the middle and the curve is readable.
+              const W = 300, H = 90, padX = 4, padY = 10;
+              const pts = chartData.map((r, i) => {
+                const x = padX + (chartData.length === 1 ? 0 : i * (W - 2 * padX) / (chartData.length - 1));
+                const y = padY + (H - 2 * padY) * (1 - (r.weight_kg - min) / range);
+                return [x, y];
+              });
+              const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+              const area = `${line} L${pts[pts.length - 1][0].toFixed(1)},${H} L${pts[0][0].toFixed(1)},${H} Z`;
+              return (
+                <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="90" preserveAspectRatio="none" style={{ display: 'block' }}>
+                  <path d={area} fill="var(--peach-soft)" />
+                  <path d={line} fill="none" stroke="var(--peach)" strokeWidth="2"
+                        strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                  {pts.map(([x, y], i) => (
+                    <circle key={chartData[i].id} cx={x} cy={y} r="2.5" fill="var(--peach)">
+                      <title>{`${fmtDate(chartData[i].log_date)}: ${chartData[i].weight_kg} kg`}</title>
+                    </circle>
+                  ))}
+                </svg>
+              );
+            })()}
             <div className="small text-muted mt-1" style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>{fmtDate(chartData[0].log_date)}</span>
               <span>min {min.toFixed(1)} / max {max.toFixed(1)} kg</span>

@@ -38,6 +38,7 @@ import { faFaceGrinStars } from '@fortawesome/free-solid-svg-icons/faFaceGrinSta
 
 import { faFileExport } from '@fortawesome/free-solid-svg-icons/faFileExport';
 import { faFileImport } from '@fortawesome/free-solid-svg-icons/faFileImport';
+import { faPersonRunning } from '@fortawesome/free-solid-svg-icons/faPersonRunning';
 
 import { faRightFromBracket } from '@fortawesome/free-solid-svg-icons/faRightFromBracket';
 import { faUser } from '@fortawesome/free-solid-svg-icons/faUser';
@@ -49,7 +50,7 @@ library.add(
   faStopwatch, faCalendarDays, faPen, faFlagCheckered, faScroll, faArrowsRotate, faFloppyDisk,
   faFaceFlushed, faFaceFrown, faFaceMehBlank, faFaceSmile, faFaceGrinStars,
   faFileExport, faFileImport,
-  faRightFromBracket, faUser,
+  faRightFromBracket, faUser, faPersonRunning,
 );
 
 const REGISTRY = {
@@ -57,6 +58,7 @@ const REGISTRY = {
   clipboard: faClipboardList,
   ruler: faRulerCombined,
   dumbbell: faDumbbell,
+  running: faPersonRunning,
   scale: faScaleBalanced,
   gear: faGear,
 

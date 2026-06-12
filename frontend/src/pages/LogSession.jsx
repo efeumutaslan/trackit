@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
+import DateField from '../components/DateField.jsx';
 
 export default function LogSession() {
   const [templates, setTemplates] = useState([]);
@@ -54,7 +55,7 @@ export default function LogSession() {
       <div className="content">
         <div className="field">
           <label>Date</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField value={date} onChange={setDate} />
         </div>
 
         <div className="section-title">Choose a template</div>
@@ -74,7 +75,7 @@ export default function LogSession() {
                   <span className="color-dot" style={{ background: t.color }} />
                   <div>
                     <h3>{t.name}</h3>
-                    <div className="sub">{t.exercises?.length || 0} exercises</div>
+                    <div className="sub">{t.exercises?.length || 0} {(t.exercises?.length || 0) === 1 ? 'exercise' : 'exercises'}</div>
                   </div>
                 </div>
                 <span style={{ color: 'var(--gray)' }}><Icon name="chevron-right" /></span>

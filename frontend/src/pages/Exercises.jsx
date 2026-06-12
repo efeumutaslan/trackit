@@ -94,7 +94,7 @@ export default function Exercises() {
                 <div className="exercise-group__list">
                   {list.map((e) => (
                     <Link to={`/exercises/${e.id}`} key={e.id} className="exercise-pill">
-                      <span><Icon name="dumbbell" /></span>
+                      <span><Icon name={e.kind === 'cardio' ? 'running' : 'dumbbell'} /></span>
                       <span>{e.name}</span>
                     </Link>
                   ))}

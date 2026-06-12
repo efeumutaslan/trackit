@@ -18,6 +18,7 @@ export default function ExerciseEdit() {
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [groupId, setGroupId] = useState('');
+  const [kind, setKind] = useState('strength');
   const [groups, setGroups] = useState([]);
   const [progress, setProgress] = useState([]);
 
@@ -30,6 +31,7 @@ export default function ExerciseEdit() {
           setName(ex.name);
           setNotes(ex.notes || '');
           setGroupId(ex.group_id ? String(ex.group_id) : '');
+          setKind(ex.kind === 'cardio' ? 'cardio' : 'strength');
         }
       });
       api.get(`/exercises/${id}/progress`).then(setProgress).catch(() => {});
@@ -38,7 +40,7 @@ export default function ExerciseEdit() {
 
   async function save() {
     if (!name.trim()) { alert('Name is required'); return; }
-    const body = { name: name.trim(), notes, group_id: groupId === '' ? null : +groupId };
+    const body = { name: name.trim(), notes, group_id: groupId === '' ? null : +groupId, kind };
     if (isNew) {
       await api.post('/exercises', body);
     } else {
@@ -78,6 +80,21 @@ export default function ExerciseEdit() {
           <div className="field">
             <label>Name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. DB OHP" />
+          </div>
+          <div className="field">
+            <label>Type</label>
+            <div className="seg-group">
+              <button
+                type="button"
+                className={`seg-btn${kind === 'strength' ? ' on' : ''}`}
+                onClick={() => setKind('strength')}
+              >Strength</button>
+              <button
+                type="button"
+                className={`seg-btn${kind === 'cardio' ? ' on' : ''}`}
+                onClick={() => setKind('cardio')}
+              >Cardio</button>
+            </div>
           </div>
           <div className="field">
             <label>Group</label>

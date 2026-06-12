@@ -37,7 +37,7 @@ export default function Templates() {
                 <div className="template-card__body">
                   <div className="template-card__name">{t.name}</div>
                   <div className="template-card__count small text-muted">
-                    {t.exercises?.length || 0} exercises
+                    {t.exercises?.length || 0} {(t.exercises?.length || 0) === 1 ? 'exercise' : 'exercises'}
                   </div>
                   {t.exercises && t.exercises.length > 0 && (
                     <ul className="template-card__list">

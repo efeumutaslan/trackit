@@ -137,6 +137,9 @@ function addCol(table, col, def) {
 
 // Exercise grouping (nullable FK)
 addCol('exercises', 'group_id', 'INTEGER REFERENCES exercise_groups(id) ON DELETE SET NULL');
+// Exercise kind drives the icon + which fields matter. 'strength' is the
+// default (weight×reps); 'cardio' is time/distance oriented.
+addCol('exercises', 'kind', "TEXT NOT NULL DEFAULT 'strength'");
 
 // Superset grouping per session-exercise (nullable text tag like 'A','B')
 addCol('session_exercises', 'superset_tag', "TEXT DEFAULT ''");
