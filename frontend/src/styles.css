@@ -1312,6 +1312,9 @@ a { color: inherit; text-decoration: none; }
 
 /* ─── Accordion (collapsed exercise card hides everything below the head) ─── */
 .exercise-block.is-collapsed > .exercise-body { display: none; }
+/* When collapsed there's nothing under the header, so drop its bottom
+   margin — that gap was making the card taller than it needed to be. */
+.exercise-block.is-collapsed .exercise-head { margin-bottom: 0; }
 .exercise-head__summary {
   margin-top: 2px;
   font-size: 13px;
@@ -1924,13 +1927,17 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
   border-top: 1px dashed var(--gray-bg);
   gap: 8px;
 }
+/* The gear sits in the same right-hand column as the top-row icons, so
+   it must share their exact metrics to line up on the card's border. */
 .exercise-head__bottom .btn.tiny {
-  padding: 4px 8px;
+  padding: 3px 5px;
+  min-width: 24px;
+  font-size: 12px;
 }
 .exercise-head__bottom .alt-toggle {
   margin-left: 0;
