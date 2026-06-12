@@ -1571,6 +1571,11 @@ a { color: inherit; text-decoration: none; }
     padding: 8px 32px 40px;
     max-width: 1400px;
     margin: 0 auto;
+    width: 100%;
+    /* .app-shell is a flex column; without an explicit width a block
+       child with margin:0 auto collapses to its content's intrinsic size
+       (this made Templates/Body/Settings sit in a ~320px column). width
+       100% makes it fill the main area up to max-width. */
   }
 
   .card { padding: 20px; }
