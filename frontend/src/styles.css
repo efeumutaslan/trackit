@@ -926,28 +926,6 @@ a { color: inherit; text-decoration: none; }
 }
 .adjust-btn:active { transform: scale(0.96); }
 
-/* Previous-session reminder: this exercise was bumped up/down last time.
-   We surface that on the button itself (a glowing ring) instead of
-   washing the whole card — so the indicator keeps its meaning while the
-   surrounding boxes stay neutral. If the user has also pressed it this
-   session, .pressed wins (it comes later / is more specific). */
-.adjust-btn.adjust-up.prev-hint {
-  box-shadow: 0 0 0 2px var(--peach), 0 0 8px rgba(211, 255, 86, 0.45);
-}
-.adjust-btn.adjust-down.prev-hint {
-  box-shadow: 0 0 0 2px var(--red), 0 0 8px rgba(255, 107, 107, 0.45);
-}
-/* A real press this session overrides the hint ring with the inset look. */
-.adjust-btn.adjust-up.prev-hint.pressed {
-  box-shadow:
-    inset 0 2px 4px rgba(0,0,0,0.6),
-    inset 0 -1px 0 rgba(255,255,255,0.08);
-}
-.adjust-btn.adjust-down.prev-hint.pressed {
-  box-shadow:
-    inset 0 2px 4px rgba(0,0,0,0.6),
-    inset 0 -1px 0 rgba(255,255,255,0.08);
-}
 
 /* ---------- Exercise card tinted from previous adjust ----------
    The prior session's ▲/▼ choice is shown as a clearly visible green
@@ -1309,6 +1287,42 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 .seg-btn:active { transform: scale(0.97); }
+
+/* Stacked segmented control — for option sets whose labels are too long
+   to sit side by side (e.g. the session-timer-start choices). */
+.seg-group--stack {
+  flex-direction: column;
+  gap: 3px;
+}
+.seg-group--stack .seg-btn {
+  width: 100%;
+  text-align: center;
+}
+
+/* Small inline info button (ⓘ) next to a section title. */
+.info-btn {
+  width: auto;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+}
+.info-btn:active { transform: scale(0.9); }
+
+/* Expandable explanation panel under a setting. */
+.info-panel {
+  background: var(--gray-bg);
+  border: 1px solid var(--gray-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.info-panel p { margin: 0 0 10px; }
 
 /* ─── Accordion (collapsed exercise card hides everything below the head) ─── */
 .exercise-block.is-collapsed > .exercise-body { display: none; }
@@ -2258,7 +2272,55 @@ a { color: inherit; text-decoration: none; }
   font-weight: 700;
 }
 
-/* ── Settings: optional-feature rows with an iOS-style toggle ── */
+/* ── Swipe-to-delete row ──────────────────────────────────────────── */
+.swipe-row {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  touch-action: pan-y; /* let vertical scroll through, capture horizontal */
+}
+.swipe-row__action {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 84px;
+  border: none;
+  border-radius: 0;
+  background: var(--red);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.swipe-row__action svg { font-size: 16px; }
+.swipe-row__content {
+  position: relative;
+  z-index: 1;
+  background: var(--cream);
+  will-change: transform;
+}
+/* The wrapped row shouldn't add its own bottom margin — the swipe-row
+   owns the spacing now. */
+.swipe-row__content > .list-row,
+.swipe-row__content > .template-card,
+.swipe-row__content > .exercise-pill { margin-bottom: 0; }
+
+/* Pills and cards carry their own background; let the swipe content be
+   transparent so the row's own surface shows (and the red action sits
+   behind it). */
+.swipe-row--pill, .swipe-row--card { background: transparent; }
+.swipe-row--pill .swipe-row__content,
+.swipe-row--card .swipe-row__content { background: transparent; }
+.swipe-row--pill { border-radius: var(--radius-md); }
+/* Group rows inside the manager card sit on the card surface. */
+.swipe-row__content > .list-row { background: transparent; }
 .feature-row {
   display: flex;
   align-items: center;

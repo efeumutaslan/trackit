@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
+import SwipeRow from '../components/SwipeRow.jsx';
 
 export default function Exercises() {
   const [rows, setRows] = useState([]);
@@ -36,6 +37,12 @@ export default function Exercises() {
     if (!confirm(msg)) return;
     await api.del(`/groups/${g.id}`);
     loadAll();
+  }
+
+  async function delExercise(ex) {
+    if (!confirm(`Delete the exercise "${ex.name}"? It's removed from your roster; past session data is kept.`)) return;
+    await api.del(`/exercises/${ex.id}`);
+    setRows((cur) => cur.filter((r) => r.id !== ex.id));
   }
 
   const grouped = rows.reduce((acc, e) => {
@@ -72,10 +79,12 @@ export default function Exercises() {
               <div className="small text-muted">No groups yet</div>
             ) : (
               groups.map((g) => (
-                <div key={g.id} className="list-row">
-                  <div className="meta">{g.name}</div>
-                  <button className="btn tiny ghost" onClick={() => delGroup(g)}><Icon name="xmark" /></button>
-                </div>
+                <SwipeRow key={g.id} onDelete={() => delGroup(g)}>
+                  <div className="list-row">
+                    <div className="meta">{g.name}</div>
+                    <button className="btn tiny ghost" onClick={() => delGroup(g)}><Icon name="xmark" /></button>
+                  </div>
+                </SwipeRow>
               ))
             )}
           </div>
@@ -93,10 +102,12 @@ export default function Exercises() {
                 <div className="exercise-group__head">{gname}</div>
                 <div className="exercise-group__list">
                   {list.map((e) => (
-                    <Link to={`/exercises/${e.id}`} key={e.id} className="exercise-pill">
-                      <span><Icon name={e.kind === 'cardio' ? 'running' : 'dumbbell'} /></span>
-                      <span>{e.name}</span>
-                    </Link>
+                    <SwipeRow key={e.id} onDelete={() => delExercise(e)} className="swipe-row--pill">
+                      <Link to={`/exercises/${e.id}`} className="exercise-pill">
+                        <span><Icon name={e.kind === 'cardio' ? 'running' : 'dumbbell'} /></span>
+                        <span>{e.name}</span>
+                      </Link>
+                    </SwipeRow>
                   ))}
                 </div>
               </div>

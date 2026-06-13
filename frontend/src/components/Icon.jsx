@@ -39,6 +39,8 @@ import { faFaceGrinStars } from '@fortawesome/free-solid-svg-icons/faFaceGrinSta
 import { faFileExport } from '@fortawesome/free-solid-svg-icons/faFileExport';
 import { faFileImport } from '@fortawesome/free-solid-svg-icons/faFileImport';
 import { faPersonRunning } from '@fortawesome/free-solid-svg-icons/faPersonRunning';
+import { faCircleInfo } from '@fortawesome/free-solid-svg-icons/faCircleInfo';
+import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash';
 
 import { faRightFromBracket } from '@fortawesome/free-solid-svg-icons/faRightFromBracket';
 import { faUser } from '@fortawesome/free-solid-svg-icons/faUser';
@@ -50,7 +52,7 @@ library.add(
   faStopwatch, faCalendarDays, faPen, faFlagCheckered, faScroll, faArrowsRotate, faFloppyDisk,
   faFaceFlushed, faFaceFrown, faFaceMehBlank, faFaceSmile, faFaceGrinStars,
   faFileExport, faFileImport,
-  faRightFromBracket, faUser, faPersonRunning,
+  faRightFromBracket, faUser, faPersonRunning, faCircleInfo, faTrash,
 );
 
 const REGISTRY = {
@@ -59,6 +61,8 @@ const REGISTRY = {
   ruler: faRulerCombined,
   dumbbell: faDumbbell,
   running: faPersonRunning,
+  'circle-info': faCircleInfo,
+  trash: faTrash,
   scale: faScaleBalanced,
   gear: faGear,
 

@@ -23,6 +23,7 @@ router.put('/', (req, res) => {
     theme,
     feat_rest_timer, feat_bodyweight, feat_weight_adjust,
     feat_prev_note, feat_tonnage, feat_heatmap,
+    session_timer_start,
   } = req.body || {};
 
   // Whitelist string values
@@ -32,6 +33,11 @@ router.put('/', (req, res) => {
 
   // Theme: only three valid values; anything else keeps the current one.
   const themeVal = ['system', 'dark', 'light'].includes(theme) ? theme : cur.theme;
+
+  // Session timer start preference: one of three modes.
+  const timerStart = ['manual', 'on_start', 'on_first_input'].includes(session_timer_start)
+    ? session_timer_start
+    : cur.session_timer_start;
 
   // Weight increment: a positive number, capped to a sane range so the
   // bumpers stay usable. Falls back to the current value when omitted or
@@ -57,7 +63,8 @@ router.put('/', (req, res) => {
            feat_weight_adjust   = ?,
            feat_prev_note       = ?,
            feat_tonnage         = ?,
-           feat_heatmap         = ?
+           feat_heatmap         = ?,
+           session_timer_start  = ?
      WHERE user_id = ?
   `).run(
     mode,
@@ -71,6 +78,7 @@ router.put('/', (req, res) => {
     flag(feat_prev_note,     cur.feat_prev_note),
     flag(feat_tonnage,       cur.feat_tonnage),
     flag(feat_heatmap,       cur.feat_heatmap),
+    timerStart,
     req.userId
   );
   res.json(db.prepare('SELECT * FROM user_settings WHERE user_id = ?').get(req.userId));

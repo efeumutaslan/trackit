@@ -74,6 +74,84 @@ export default function Session() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Madde 1 — Session timer start preference.
+  // 'on_start': stamp started_at as soon as the session opens (if unset).
+  // 'on_first_input': handled by markFirstInput() called from edits.
+  // 'manual': only the Start button (or Finish fallback) sets it.
+  const timerPref = settings?.session_timer_start || 'manual';
+  useEffect(() => {
+    if (!s) return;
+    if (timerPref === 'on_start' && !s.started_at) {
+      const nowIso = new Date().toISOString();
+      api.post(`/sessions/${id}/start`, { at: nowIso })
+        .then((r) => setS((cur) => ({ ...cur, started_at: r.started_at })))
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s?.id, timerPref]);
+
+  // Called from any real input change (set value, notes, adjust, etc).
+  // Starts the timer on the first such change when the pref wants it, and
+  // marks the session as "touched" so it won't be auto-deleted.
+  const dirtyRef = useRef(false);
+  const markFirstInput = useCallback(() => {
+    dirtyRef.current = true;
+    if (timerPref !== 'on_first_input') return;
+    setS((cur) => {
+      if (!cur || cur.started_at) return cur;
+      const nowIso = new Date().toISOString();
+      api.post(`/sessions/${id}/start`, { at: nowIso }).catch(() => {});
+      return { ...cur, started_at: nowIso };
+    });
+  }, [timerPref, id]);
+
+  // Madde 3 — auto-delete an untouched session on leave, but ONLY when
+  // the timer preference is 'on_first_input' or 'manual'. If the user
+  // opened a session and never entered anything (no input, never started,
+  // never finished), it shouldn't be kept. Refs hold the latest values so
+  // the unmount cleanup doesn't act on stale state.
+  const sRef = useRef(null);
+  const prefRef = useRef('manual');
+  useEffect(() => { sRef.current = s; }, [s]);
+  useEffect(() => { prefRef.current = timerPref; }, [timerPref]);
+
+  // Shared check + delete used by both the SPA-unmount cleanup and the
+  // hard-exit (tab close / refresh) handler.
+  const deleteIfUntouched = useCallback((useKeepalive) => {
+    const cur = sRef.current;
+    const pref = prefRef.current;
+    if (!cur) return;
+    if (pref !== 'on_first_input' && pref !== 'manual') return;
+    const untouched = !dirtyRef.current && !cur.started_at && !cur.finished_at;
+    if (!untouched) return;
+    if (useKeepalive) {
+      // The page is being torn down — a normal fetch would be cancelled,
+      // so use keepalive so the DELETE still reaches the server.
+      try {
+        const token = localStorage.getItem('trackit_token');
+        fetch(`/api/sessions/${cur.id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+          keepalive: true,
+        }).catch(() => {});
+      } catch { /* ignore */ }
+    } else {
+      api.del(`/sessions/${cur.id}`).catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    // Hard exits (close tab, refresh, navigate away from the app): React's
+    // unmount cleanup won't run, so listen for pagehide too.
+    const onHide = () => deleteIfUntouched(true);
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      window.removeEventListener('pagehide', onHide);
+      // SPA navigation away from this route: normal cleanup.
+      deleteIfUntouched(false);
+    };
+  }, [deleteIfUntouched]);
+
   // Tick to redraw the countdown each second. Using a separate counter
   // because setRestEnd(v => v) bails out (React skips re-renders when the
   // returned value is the same reference).
@@ -125,6 +203,18 @@ export default function Session() {
   }
   async function finishWO() {
     const nowIso = new Date().toISOString();
+    // Manual fallback: if the timer was never started, stamp the start
+    // with the session's original open time so the duration still makes
+    // sense (created_at is the moment the session was opened).
+    if (!s.started_at && s.created_at) {
+      const openIso = s.created_at.includes('T')
+        ? s.created_at
+        : s.created_at.replace(' ', 'T') + 'Z';
+      try {
+        const sr = await api.post(`/sessions/${id}/start`, { at: openIso });
+        setS((cur) => ({ ...cur, started_at: sr.started_at }));
+      } catch { /* ignore */ }
+    }
     const r = await api.post(`/sessions/${id}/finish`, { at: nowIso });
     setS((cur) => ({ ...cur, finished_at: r.finished_at }));
   }
@@ -238,7 +328,7 @@ export default function Session() {
             <textarea
               value={s.workout_notes || ''}
               onChange={(e) => setS((cur) => ({ ...cur, workout_notes: e.target.value }))}
-              onBlur={() => saveMeta({ workout_notes: s.workout_notes })}
+              onBlur={() => { markFirstInput(); saveMeta({ workout_notes: s.workout_notes }); }}
               placeholder="Notes about this workout…"
             />
           </div>
@@ -302,6 +392,7 @@ export default function Session() {
                 reload={load}
                 sessionDate={s.session_date}
                 onAfterRestSet={startRest}
+                onFirstInput={markFirstInput}
                 expandMode={s.expand_mode || 'expandable'}
                 settings={settings}
                 supersetPos={supersetPos}
@@ -343,7 +434,7 @@ export default function Session() {
 }
 
 function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
-                        expandMode, settings, supersetPos }) {
+                        onFirstInput, expandMode, settings, supersetPos }) {
   const [notes, setNotes] = useState(ex.exercise_notes || '');
   const [adjust, setAdjust] = useState(ex.weight_adjust || '');
   const [targetReps, setTargetReps] = useState(ex.target_reps || '');
@@ -395,6 +486,7 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
   };
 
   async function saveMeta(patch) {
+    onFirstInput?.();
     await api.put(`/sessions/${sessionId}/exercises/${ex.id}`, {
       exercise_notes: notes,
       weight_adjust: adjust,
@@ -647,6 +739,7 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
             repPlaceholderMode={settings?.rep_placeholder_mode || 'empty'}
             weightIncrement={Number(settings?.weight_increment) > 0 ? Number(settings.weight_increment) : 2.5}
             onSaved={async (evt) => {
+              onFirstInput?.();
               if (evt && evt.kind === 'kg') {
                 // Cascade the new kg value down to later empty sets,
                 // but DO NOT start the rest timer for a kg change.
@@ -691,14 +784,14 @@ function ExerciseBlock({ sessionId, ex, reload, sessionDate, onAfterRestSet,
           {settings?.feat_weight_adjust !== 0 && (
             <div className="adjust-stack">
               <button
-                className={`adjust-btn adjust-up${adjust === 'up' ? ' pressed' : ''}${ex.prev_weight_adjust === 'up' ? ' prev-hint' : ''}`}
+                className={`adjust-btn adjust-up${adjust === 'up' ? ' pressed' : ''}`}
                 onClick={() => setAdjustValue('up')}
-                title={ex.prev_weight_adjust === 'up' ? 'Last time: go heavier' : 'Plan to go heavier next time'}
+                title="Plan to go heavier next time"
               ><Icon name="caret-up" /></button>
               <button
-                className={`adjust-btn adjust-down${adjust === 'down' ? ' pressed' : ''}${ex.prev_weight_adjust === 'down' ? ' prev-hint' : ''}`}
+                className={`adjust-btn adjust-down${adjust === 'down' ? ' pressed' : ''}`}
                 onClick={() => setAdjustValue('down')}
-                title={ex.prev_weight_adjust === 'down' ? 'Last time: back off' : 'Plan to back off next time'}
+                title="Plan to back off next time"
               ><Icon name="caret-down" /></button>
             </div>
           )}

@@ -9,6 +9,7 @@ import Icon from '../components/Icon.jsx';
 export default function Settings() {
   const { settings, update } = useSettings();
   const [importStatus, setImportStatus] = useState('');
+  const [timerInfoOpen, setTimerInfoOpen] = useState(false);
   const [incInput, setIncInput] = useState(
     settings?.weight_increment != null ? String(settings.weight_increment) : '2.5'
   );
@@ -126,6 +127,44 @@ export default function Settings() {
               </button>
             </div>
           ))}
+        </div>
+
+        {/* ── Session timer start ──────────────────────────────────────── */}
+        <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>Session timer start</span>
+          <button
+            className="info-btn"
+            aria-label="What do these options mean?"
+            onClick={() => setTimerInfoOpen((o) => !o)}
+          ><Icon name="circle-info" /></button>
+        </div>
+        <div className="card">
+          <div className="small text-muted mb-1">
+            When the workout timer's start time is recorded.
+          </div>
+          <div className="seg-group seg-group--stack">
+            {[
+              { v: 'on_start',       label: 'Automatic on session start' },
+              { v: 'on_first_input', label: 'Automatic on first input' },
+              { v: 'manual',         label: 'Manual' },
+            ].map((o) => (
+              <button
+                key={o.v}
+                className={`seg-btn${(settings?.session_timer_start || 'manual') === o.v ? ' on' : ''}`}
+                onClick={() => update({ session_timer_start: o.v })}
+              >{o.label}</button>
+            ))}
+          </div>
+          {timerInfoOpen && (
+            <div className="info-panel mt-2">
+              <p><strong>Automatic on session start</strong><br />
+                Timer starts as soon as the session opens.</p>
+              <p><strong>Automatic on first input</strong><br />
+                Timer starts when the first input change happens after the session opens.</p>
+              <p style={{ marginBottom: 0 }}><strong>Manual</strong><br />
+                Timer starts only when manually started. If Finish is pressed prior to starting the session timer, initial open time is used automatically.</p>
+            </div>
+          )}
         </div>
 
         {/* ── Rep input placeholder ────────────────────────────────────── */}

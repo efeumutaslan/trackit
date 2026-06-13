@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
+import SwipeRow from '../components/SwipeRow.jsx';
 
 export default function Templates() {
   const [rows, setRows] = useState([]);
@@ -19,6 +20,12 @@ export default function Templates() {
     nav(`/templates/${newTpl.id}`);
   }
 
+  async function delTemplate(t) {
+    if (!confirm(`Delete the template "${t.name}"? Logged sessions that used it are kept.`)) return;
+    await api.del(`/templates/${t.id}`);
+    setRows((cur) => cur.filter((r) => r.id !== t.id));
+  }
+
   return (
     <div className="app-shell page-templates">
       <TopBar back title="Templates" />
@@ -32,26 +39,28 @@ export default function Templates() {
         ) : (
           <div className="template-grid">
             {rows.map((t) => (
-              <Link to={`/templates/${t.id}`} key={t.id} className="template-card">
-                <div className="template-card__strip" style={{ background: t.color }} />
-                <div className="template-card__body">
-                  <div className="template-card__name">{t.name}</div>
-                  <div className="template-card__count small text-muted">
-                    {t.exercises?.length || 0} {(t.exercises?.length || 0) === 1 ? 'exercise' : 'exercises'}
+              <SwipeRow key={t.id} onDelete={() => delTemplate(t)} className="swipe-row--card">
+                <Link to={`/templates/${t.id}`} className="template-card">
+                  <div className="template-card__strip" style={{ background: t.color }} />
+                  <div className="template-card__body">
+                    <div className="template-card__name">{t.name}</div>
+                    <div className="template-card__count small text-muted">
+                      {t.exercises?.length || 0} {(t.exercises?.length || 0) === 1 ? 'exercise' : 'exercises'}
+                    </div>
+                    {t.exercises && t.exercises.length > 0 && (
+                      <ul className="template-card__list">
+                        {t.exercises.slice(0, 5).map((ex) => (
+                          <li key={ex.id}>{ex.exercise_name || ex.name}</li>
+                        ))}
+                        {t.exercises.length > 5 && (
+                          <li className="text-muted">…and {t.exercises.length - 5} more</li>
+                        )}
+                      </ul>
+                    )}
                   </div>
-                  {t.exercises && t.exercises.length > 0 && (
-                    <ul className="template-card__list">
-                      {t.exercises.slice(0, 5).map((ex) => (
-                        <li key={ex.id}>{ex.exercise_name || ex.name}</li>
-                      ))}
-                      {t.exercises.length > 5 && (
-                        <li className="text-muted">…and {t.exercises.length - 5} more</li>
-                      )}
-                    </ul>
-                  )}
-                </div>
-                <button className="template-card__clone btn tiny ghost" onClick={(e) => clone(e, t)} title="Duplicate template">Duplicate</button>
-              </Link>
+                  <button className="template-card__clone btn tiny ghost" onClick={(e) => clone(e, t)} title="Duplicate template">Duplicate</button>
+                </Link>
+              </SwipeRow>
             ))}
           </div>
         )}

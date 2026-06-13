@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
   feat_prev_note       INTEGER NOT NULL DEFAULT 1,        -- show the previous-exercise-note card
   feat_tonnage         INTEGER NOT NULL DEFAULT 1,        -- show the per-exercise tonnage
   feat_heatmap         INTEGER NOT NULL DEFAULT 1,        -- show the home calendar/heatmap
+  session_timer_start  TEXT NOT NULL DEFAULT 'manual',    -- 'manual' | 'on_start' | 'on_first_input'
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 `);
@@ -217,6 +218,12 @@ addCol('user_settings', 'feat_weight_adjust', 'INTEGER NOT NULL DEFAULT 1');
 addCol('user_settings', 'feat_prev_note',     'INTEGER NOT NULL DEFAULT 1');
 addCol('user_settings', 'feat_tonnage',       'INTEGER NOT NULL DEFAULT 1');
 addCol('user_settings', 'feat_heatmap',       'INTEGER NOT NULL DEFAULT 1');
+// When the session timer's start time gets recorded:
+//   'manual'         — only when the user taps Start (or, on Finish
+//                      without a start, the session's open time is used)
+//   'on_start'       — automatically the moment the session opens
+//   'on_first_input' — automatically on the first input change
+addCol('user_settings', 'session_timer_start', "TEXT NOT NULL DEFAULT 'manual'");
 
 // Purge auth tokens older than 90 days on startup so the table doesn't
 // grow unbounded (authMiddleware also rejects them lazily per request,
