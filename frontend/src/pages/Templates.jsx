@@ -59,6 +59,11 @@ export default function Templates() {
                     )}
                   </div>
                   <button className="template-card__clone btn tiny ghost" onClick={(e) => clone(e, t)} title="Duplicate template">Duplicate</button>
+                  <button
+                    className="template-card__del btn tiny ghost desktop-only"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); delTemplate(t); }}
+                    title="Delete template"
+                  ><Icon name="trash" /></button>
                 </Link>
               </SwipeRow>
             ))}

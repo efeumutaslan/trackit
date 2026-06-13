@@ -88,7 +88,15 @@ export default function Sessions() {
                     </div>
                     <div>{fmtDuration(s.started_at, s.finished_at) || '—'}</div>
                     <div className="data-table__mood">{s.mood || ''}</div>
-                    <div style={{ color: 'var(--gray)' }}><Icon name="chevron-right" /></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+                      <button
+                        className="btn tiny ghost"
+                        style={{ color: 'var(--red)' }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); delSession(s); }}
+                        title="Delete session"
+                      ><Icon name="trash" /></button>
+                      <span style={{ color: 'var(--gray)' }}><Icon name="chevron-right" /></span>
+                    </div>
                   </Link>
                 ))}
               </div>

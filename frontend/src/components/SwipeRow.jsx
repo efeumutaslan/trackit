@@ -68,7 +68,7 @@ export default function SwipeRow({ children, onDelete, deleteLabel = 'Delete', c
     <div className={`swipe-row ${className}`.trim()}>
       <button
         className="swipe-row__action"
-        style={{ width: REVEAL }}
+        style={{ width: REVEAL, opacity: dx < -2 ? 1 : 0, pointerEvents: dx < -2 ? 'auto' : 'none' }}
         onClick={doDelete}
         tabIndex={open ? 0 : -1}
         aria-label={deleteLabel}
@@ -83,10 +83,6 @@ export default function SwipeRow({ children, onDelete, deleteLabel = 'Delete', c
         onTouchStart={(e) => down(e.touches[0].clientX, e.touches[0].clientY)}
         onTouchMove={(e) => moveTo(e.touches[0].clientX, e.touches[0].clientY)}
         onTouchEnd={up}
-        onPointerDown={(e) => { if (e.pointerType === 'mouse') down(e.clientX, e.clientY); }}
-        onPointerMove={(e) => { if (e.pointerType === 'mouse' && dragging.current) moveTo(e.clientX, e.clientY); }}
-        onPointerUp={(e) => { if (e.pointerType === 'mouse') up(); }}
-        onPointerLeave={(e) => { if (e.pointerType === 'mouse' && dragging.current) up(); }}
       >
         {children}
       </div>

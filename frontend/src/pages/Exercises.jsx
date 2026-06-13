@@ -105,7 +105,12 @@ export default function Exercises() {
                     <SwipeRow key={e.id} onDelete={() => delExercise(e)} className="swipe-row--pill">
                       <Link to={`/exercises/${e.id}`} className="exercise-pill">
                         <span><Icon name={e.kind === 'cardio' ? 'running' : 'dumbbell'} /></span>
-                        <span>{e.name}</span>
+                        <span className="exercise-pill__name">{e.name}</span>
+                        <button
+                          className="exercise-pill__del desktop-only"
+                          onClick={(ev) => { ev.preventDefault(); ev.stopPropagation(); delExercise(e); }}
+                          title="Delete exercise"
+                        ><Icon name="trash" /></button>
                       </Link>
                     </SwipeRow>
                   ))}
