@@ -1,7 +1,7 @@
 # TrackIt — Caddy reverse proxy config
 # Append this to the server's /etc/caddy/Caddyfile
 
-track-it.duckdns.org {
+trackit-demo.duckdns.org {
     reverse_proxy localhost:3000
 
     # Logs (opsiyonel)
