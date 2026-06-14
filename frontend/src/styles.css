@@ -51,14 +51,14 @@
   --peach-soft: rgba(146, 196, 0, 0.16);
   --peach-bg: #EEF6D6;       /* faint green-tinted block bg */
 
-  --cream: #F4F5F0;          /* page background */
+  --cream: #E8EAE2;          /* page background — a touch darker so white cards separate */
   --white: #FFFFFF;          /* cards / elevated surface */
 
   --ink: #1B1C19;            /* primary text — near-black */
   --ink-soft: #565752;       /* secondary text */
   --gray: #8A8B85;           /* muted */
-  --gray-soft: #D9DAD2;      /* borders, dividers */
-  --gray-bg: #ECEDE6;        /* subtle inset background */
+  --gray-soft: #D2D4CA;      /* borders, dividers */
+  --gray-bg: #E0E2D9;        /* subtle inset background */
 
   --green: #6E9400;          /* success reads on white */
   --red:   #D64545;          /* destructive */
