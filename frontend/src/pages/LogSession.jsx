@@ -4,8 +4,10 @@ import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
 import DateField from '../components/DateField.jsx';
+import { useSettings } from '../lib/settings.jsx';
 
 export default function LogSession() {
+  const { settings } = useSettings();
   const [templates, setTemplates] = useState([]);
   const [date, setDate] = useState(() => {
     // Local-time YYYY-MM-DD (avoids the UTC drift at night)
@@ -24,10 +26,14 @@ export default function LogSession() {
     if (busy) return;
     setBusy(true);
     try {
+      // Respect the timer-start preference: only stamp started_at up front
+      // when the user wants it automatic on session start. For 'manual' and
+      // 'on_first_input' the Session screen handles when (if ever) it starts.
+      const autoStart = (settings?.session_timer_start || 'manual') === 'on_start';
       const s = await api.post('/sessions', {
         template_id: t.id,
         session_date: date,
-        started_at: new Date().toISOString(),
+        ...(autoStart ? { started_at: new Date().toISOString() } : {}),
       });
       nav(`/sessions/${s.id}`);
     } finally {
@@ -39,9 +45,10 @@ export default function LogSession() {
     if (busy) return;
     setBusy(true);
     try {
+      const autoStart = (settings?.session_timer_start || 'manual') === 'on_start';
       const s = await api.post('/sessions', {
         session_date: date,
-        started_at: new Date().toISOString(),
+        ...(autoStart ? { started_at: new Date().toISOString() } : {}),
       });
       nav(`/sessions/${s.id}`);
     } finally {
