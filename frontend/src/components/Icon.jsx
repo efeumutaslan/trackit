@@ -41,6 +41,9 @@ import { faFileImport } from '@fortawesome/free-solid-svg-icons/faFileImport';
 import { faPersonRunning } from '@fortawesome/free-solid-svg-icons/faPersonRunning';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons/faCircleInfo';
 import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash';
+import { faDroplet } from '@fortawesome/free-solid-svg-icons/faDroplet';
+import { faMugHot } from '@fortawesome/free-solid-svg-icons/faMugHot';
+import { faGlassWater } from '@fortawesome/free-solid-svg-icons/faGlassWater';
 
 import { faRightFromBracket } from '@fortawesome/free-solid-svg-icons/faRightFromBracket';
 import { faUser } from '@fortawesome/free-solid-svg-icons/faUser';
@@ -53,6 +56,7 @@ library.add(
   faFaceFlushed, faFaceFrown, faFaceMehBlank, faFaceSmile, faFaceGrinStars,
   faFileExport, faFileImport,
   faRightFromBracket, faUser, faPersonRunning, faCircleInfo, faTrash,
+  faDroplet, faMugHot, faGlassWater,
 );
 
 const REGISTRY = {
@@ -63,6 +67,9 @@ const REGISTRY = {
   running: faPersonRunning,
   'circle-info': faCircleInfo,
   trash: faTrash,
+  droplet: faDroplet,
+  'mug-hot': faMugHot,
+  'glass-water': faGlassWater,
   scale: faScaleBalanced,
   gear: faGear,
 

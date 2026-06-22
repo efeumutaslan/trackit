@@ -13,6 +13,9 @@ export default function Settings() {
   const [incInput, setIncInput] = useState(
     settings?.weight_increment != null ? String(settings.weight_increment) : '2.5'
   );
+  const [goalInput, setGoalInput] = useState(
+    settings?.water_goal_ml != null ? String(settings.water_goal_ml) : '2500'
+  );
   const { logoutAll } = useAuth();
 
   async function exportCsv() {
@@ -60,6 +63,7 @@ export default function Settings() {
     { key: 'feat_prev_note',     label: 'Previous exercise note', desc: 'The card recalling last session\u2019s note.' },
     { key: 'feat_tonnage',       label: 'Tonnage',              desc: 'Total volume (kg\u00d7reps) shown per exercise.' },
     { key: 'feat_heatmap',       label: 'Home calendar',        desc: 'The activity calendar / heatmap on the home screen.' },
+    { key: 'feat_water',         label: 'Water tracking',       desc: 'Log drinks and track your daily water goal on the Body page.' },
   ];
 
   const isOn = (k) => settings?.[k] === 1 || settings?.[k] === true;
@@ -81,6 +85,13 @@ export default function Settings() {
             <span className="settings-link-row__label">Exercises</span>
             <span className="settings-link-row__chev"><Icon name="chevron-right" /></span>
           </Link>
+          {isOn('feat_water') && (
+            <Link to="/nutrition" className="settings-link-row">
+              <span className="settings-link-row__icon"><Icon name="droplet" /></span>
+              <span className="settings-link-row__label">Nutrition</span>
+              <span className="settings-link-row__chev"><Icon name="chevron-right" /></span>
+            </Link>
+          )}
         </div>
 
         {/* ── Appearance / theme ───────────────────────────────────────── */}
@@ -128,6 +139,33 @@ export default function Settings() {
             </div>
           ))}
         </div>
+
+        {/* ── Water goal (when water tracking is on) ───────────────────── */}
+        {isOn('feat_water') && (
+          <>
+            <div className="section-title">Daily water goal</div>
+            <div className="card">
+              <div className="small text-muted mb-1">
+                Your daily hydration target. Logged drinks count toward it by their water content.
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Goal (ml)</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={goalInput}
+                  onChange={(e) => setGoalInput(e.target.value)}
+                  onBlur={() => {
+                    const n = parseInt(goalInput, 10);
+                    if (Number.isFinite(n) && n >= 100 && n <= 20000) update({ water_goal_ml: n });
+                    else setGoalInput(String(settings?.water_goal_ml ?? 2500));
+                  }}
+                  placeholder="2500"
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         {/* ── Session timer start ──────────────────────────────────────── */}
         <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

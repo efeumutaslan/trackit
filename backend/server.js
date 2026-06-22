@@ -11,6 +11,8 @@ import groupRoutes from './routes/groups.js';
 import bodyweightRoutes from './routes/bodyweight.js';
 import csvRoutes from './routes/csv.js';
 import settingsRoutes from './routes/settings.js';
+import nutritionRoutes from './routes/nutrition.js';
+import waterRoutes from './routes/water.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -29,6 +31,8 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/bodyweight', bodyweightRoutes);
 app.use('/api/csv', csvRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/nutrition', nutritionRoutes);
+app.use('/api/water', waterRoutes);
 
 // Production: serve frontend build
 const publicDir = path.join(__dirname, 'public');

@@ -3,6 +3,8 @@ import TopBar from '../components/TopBar.jsx';
 import { api } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
 import DateField, { fmtDate } from '../components/DateField.jsx';
+import WaterTracker from '../components/WaterTracker.jsx';
+import { useSettings } from '../lib/settings.jsx';
 
 function todayISO() {
   const d = new Date();
@@ -11,6 +13,7 @@ function todayISO() {
 }
 
 export default function Bodyweight() {
+  const { settings } = useSettings();
   const [rows, setRows] = useState([]);
   const [date, setDate] = useState(todayISO);
   const [w, setW] = useState('');
@@ -45,6 +48,7 @@ export default function Bodyweight() {
     <div className="app-shell page-bodyweight">
       <TopBar back title="Bodyweight" />
       <div className="content">
+        {settings?.feat_water !== 0 && <WaterTracker date={todayISO()} />}
         <div className="card">
           <div className="row mb-1">
             <div>

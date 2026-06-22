@@ -122,6 +122,38 @@ CREATE TABLE IF NOT EXISTS bodyweight (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_bw_user_date ON bodyweight(user_id, log_date);
+
+-- Nutrition library: drinks the user can log, each with a water factor.
+-- water_factor 0..1 = how much of the volume counts as water (Water=1.0,
+-- coffee≈0.95, juice≈0.85, an iced americano≈0.8, etc).
+CREATE TABLE IF NOT EXISTS nutrition_items (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       INTEGER NOT NULL,
+  name          TEXT NOT NULL,
+  water_factor  REAL NOT NULL DEFAULT 1.0,
+  default_ml    INTEGER,
+  archived      INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE (user_id, name)
+);
+
+-- Water log: each drink the user records on a given day. amount_ml is what
+-- they drank; water_ml is the hydration credited (amount_ml * water_factor),
+-- stored so historical totals stay correct even if the item changes later.
+CREATE TABLE IF NOT EXISTS water_log (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id            INTEGER NOT NULL,
+  log_date           TEXT NOT NULL,
+  nutrition_item_id  INTEGER,
+  label              TEXT DEFAULT '',
+  amount_ml          INTEGER NOT NULL,
+  water_ml           INTEGER NOT NULL,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (nutrition_item_id) REFERENCES nutrition_items(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_water_user_date ON water_log(user_id, log_date);
 `);
 
 // ── Incremental migrations for existing DBs (add columns if missing) ──
@@ -204,6 +236,8 @@ CREATE TABLE IF NOT EXISTS user_settings (
   feat_tonnage         INTEGER NOT NULL DEFAULT 1,        -- show the per-exercise tonnage
   feat_heatmap         INTEGER NOT NULL DEFAULT 1,        -- show the home calendar/heatmap
   session_timer_start  TEXT NOT NULL DEFAULT 'manual',    -- 'manual' | 'on_start' | 'on_first_input'
+  feat_water           INTEGER NOT NULL DEFAULT 1,        -- water tracking on the Body page
+  water_goal_ml        INTEGER NOT NULL DEFAULT 2500,     -- daily water target
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 `);
@@ -224,6 +258,8 @@ addCol('user_settings', 'feat_heatmap',       'INTEGER NOT NULL DEFAULT 1');
 //   'on_start'       — automatically the moment the session opens
 //   'on_first_input' — automatically on the first input change
 addCol('user_settings', 'session_timer_start', "TEXT NOT NULL DEFAULT 'manual'");
+addCol('user_settings', 'feat_water',    'INTEGER NOT NULL DEFAULT 1');
+addCol('user_settings', 'water_goal_ml', 'INTEGER NOT NULL DEFAULT 2500');
 
 // Purge auth tokens older than 90 days on startup so the table doesn't
 // grow unbounded (authMiddleware also rejects them lazily per request,

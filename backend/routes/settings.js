@@ -24,6 +24,7 @@ router.put('/', (req, res) => {
     feat_rest_timer, feat_bodyweight, feat_weight_adjust,
     feat_prev_note, feat_tonnage, feat_heatmap,
     session_timer_start,
+    feat_water, water_goal_ml,
   } = req.body || {};
 
   // Whitelist string values
@@ -38,6 +39,13 @@ router.put('/', (req, res) => {
   const timerStart = ['manual', 'on_start', 'on_first_input'].includes(session_timer_start)
     ? session_timer_start
     : cur.session_timer_start;
+
+  // Daily water goal: a positive number of ml, capped to a sane range.
+  let waterGoal = cur.water_goal_ml;
+  if (water_goal_ml !== undefined) {
+    const n = typeof water_goal_ml === 'number' ? water_goal_ml : parseInt(water_goal_ml, 10);
+    if (Number.isFinite(n) && n >= 100 && n <= 20000) waterGoal = Math.round(n);
+  }
 
   // Weight increment: a positive number, capped to a sane range so the
   // bumpers stay usable. Falls back to the current value when omitted or
@@ -64,7 +72,9 @@ router.put('/', (req, res) => {
            feat_prev_note       = ?,
            feat_tonnage         = ?,
            feat_heatmap         = ?,
-           session_timer_start  = ?
+           session_timer_start  = ?,
+           feat_water           = ?,
+           water_goal_ml        = ?
      WHERE user_id = ?
   `).run(
     mode,
@@ -79,6 +89,8 @@ router.put('/', (req, res) => {
     flag(feat_tonnage,       cur.feat_tonnage),
     flag(feat_heatmap,       cur.feat_heatmap),
     timerStart,
+    flag(feat_water,         cur.feat_water),
+    waterGoal,
     req.userId
   );
   res.json(db.prepare('SELECT * FROM user_settings WHERE user_id = ?').get(req.userId));

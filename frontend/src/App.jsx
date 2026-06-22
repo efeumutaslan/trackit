@@ -14,6 +14,8 @@ import TemplateEdit from './pages/TemplateEdit.jsx';
 import Exercises from './pages/Exercises.jsx';
 import ExerciseEdit from './pages/ExerciseEdit.jsx';
 import Bodyweight from './pages/Bodyweight.jsx';
+import Nutrition from './pages/Nutrition.jsx';
+import NutritionEdit from './pages/NutritionEdit.jsx';
 import Settings from './pages/Settings.jsx';
 
 export default function App() {
@@ -47,6 +49,8 @@ export default function App() {
           <Route path="/exercises" element={<Exercises />} />
           <Route path="/exercises/:id" element={<ExerciseEdit />} />
           <Route path="/bodyweight" element={<Bodyweight />} />
+          <Route path="/nutrition" element={<Nutrition />} />
+          <Route path="/nutrition/:id" element={<NutritionEdit />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
