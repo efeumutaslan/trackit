@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import Icon from './Icon.jsx';
 
+// The user's local calendar day (YYYY-MM-DD), so the tracker follows the
+// user's own clock — a day boundary at their local 00:00, not UTC.
+function localToday() {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d - tz).toISOString().slice(0, 10);
+}
+
 function drinkIcon(name) {
   const n = (name || '').toLowerCase();
   if (/coffee|americano|espresso|latte|cappuccino|mocha|tea|çay|kahve/.test(n)) return 'mug-hot';
@@ -87,12 +95,40 @@ function WaterRing({ total, goal }) {
   );
 }
 
-export default function WaterTracker({ date }) {
+export default function WaterTracker() {
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState({ total_ml: 0, goal_ml: 2500, entries: [] });
   const [picking, setPicking] = useState(null);  // item being logged
   const [amount, setAmount] = useState('');
   const inputRef = useRef(null);
+
+  // The day the tracker is showing — the user's local "today". It rolls
+  // over automatically at local midnight (and whenever the tab regains
+  // focus, in case the device slept across the boundary), so the ring
+  // resets to 0 for the new day without needing a manual reload.
+  const [date, setDate] = useState(localToday);
+  useEffect(() => {
+    function syncDay() {
+      const t = localToday();
+      setDate((cur) => (cur === t ? cur : t));
+    }
+    // Schedule a tick just after the next local midnight, then re-arm.
+    let timer;
+    function arm() {
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(24, 0, 1, 0); // 00:00:01 local tomorrow
+      timer = setTimeout(() => { syncDay(); arm(); }, next - now);
+    }
+    arm();
+    document.addEventListener('visibilitychange', syncDay);
+    window.addEventListener('focus', syncDay);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', syncDay);
+      window.removeEventListener('focus', syncDay);
+    };
+  }, []);
 
   function loadSummary() {
     api.get(`/water?date=${date}`).then(setSummary).catch(() => {});

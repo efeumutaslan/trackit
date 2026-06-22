@@ -48,7 +48,7 @@ export default function Bodyweight() {
     <div className="app-shell page-bodyweight">
       <TopBar back title="Bodyweight" />
       <div className="content">
-        {settings?.feat_water !== 0 && <WaterTracker date={todayISO()} />}
+        {settings?.feat_water !== 0 && <WaterTracker />}
         <div className="card">
           <div className="row mb-1">
             <div>
