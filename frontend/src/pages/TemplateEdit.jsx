@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import TopBar from '../components/TopBar.jsx';
+import { useNavGuard } from '../lib/navguard.jsx';
 import { api } from '../lib/api.js';
 import Icon from '../components/Icon.jsx';
 
@@ -64,6 +65,10 @@ export default function TemplateEdit() {
   const [replaceIdx, setReplaceIdx] = useState(null); // index being replaced
   const [showLeave, setShowLeave] = useState(false);  // Save / Discard prompt
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
+  // Where to go after the Save/Discard prompt resolves. null => back to
+  // /templates (the back-button case); a function => run it (nav-guard).
+  const pendingNavRef = useRef(null);
+  const { setGuard, clearGuard } = useNavGuard();
 
   // The template id we are persisting to. For an existing template it's
   // the route param; for a brand-new one it gets filled the moment
@@ -157,24 +162,67 @@ export default function TemplateEdit() {
     return () => clearTimeout(t);
   }, [currentSnap, dirty, name, isNew]);
 
+  // Register / clear the unsaved-changes guard so that clicking the
+  // sidebar or bottom-nav (any in-app link) while dirty shows the
+  // Save/Discard prompt instead of silently losing changes.
+  useEffect(() => {
+    if (dirty) {
+      setGuard((proceed) => {
+        pendingNavRef.current = proceed;   // run this if the user leaves
+        setShowLeave(true);
+      });
+    } else {
+      clearGuard();
+    }
+    return () => clearGuard();
+  }, [dirty, setGuard, clearGuard]);
+
+  // Also guard a hard browser navigation (refresh / close tab).
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const onBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
+  // Run the pending navigation (or fall back to /templates), clearing the
+  // guard first so the interceptor doesn't re-fire.
+  function doLeave() {
+    clearGuard();
+    const proceed = pendingNavRef.current;
+    pendingNavRef.current = null;
+    if (proceed) proceed();
+    else nav('/templates');
+  }
+
   // Back navigation: if everything is saved just leave; if there are
   // unsaved changes (autosave still pending, name missing, or a save
   // failed) ask Save / Discard first.
   function onBack() {
     if (!dirty) { nav('/templates'); return; }
+    pendingNavRef.current = null;   // back button => default destination
     setShowLeave(true);
   }
   async function leaveSave() {
     const ok = await persistRef.current();
-    if (ok) nav('/templates');
+    if (ok) { setShowLeave(false); doLeave(); }
     else alert('Could not save — check the template name and your connection.');
   }
-  function leaveDiscard() { nav('/templates'); }
+  function leaveDiscard() {
+    savedSnapRef.current = currentSnap; // mark clean so guard clears
+    setShowLeave(false);
+    doLeave();
+  }
+  function leaveCancel() {
+    pendingNavRef.current = null;
+    setShowLeave(false);
+  }
 
   async function del() {
     if (!confirm('Delete this template? (Past sessions are unaffected)')) return;
     if (tmplIdRef.current) await api.del(`/templates/${tmplIdRef.current}`);
     savedSnapRef.current = currentSnap; // suppress the leave prompt
+    clearGuard();
     nav('/templates');
   }
 
@@ -401,6 +449,17 @@ export default function TemplateEdit() {
 
         <button className="btn" onClick={() => setShowAdd(true)}>+ Add exercise</button>
 
+        <button
+          className="btn primary mt-2"
+          onClick={async () => {
+            const ok = await persistRef.current();
+            if (!ok) alert('Could not save — check the template name and your connection.');
+          }}
+          disabled={!dirty || !name.trim() || saveState === 'saving'}
+        >
+          {saveState === 'saving' ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}
+        </button>
+
         {showAdd && (
           <AddExerciseModal
             roster={roster}
@@ -426,7 +485,7 @@ export default function TemplateEdit() {
         )}
 
         {showLeave && (
-          <div className="modal-bg" onClick={() => setShowLeave(false)}>
+          <div className="modal-bg" onClick={leaveCancel}>
             <div className="modal" onClick={(e) => e.stopPropagation()}>
               <h3>Do you want to save changes?</h3>
               <div className="small text-muted" style={{ marginBottom: 14 }}>
@@ -434,6 +493,7 @@ export default function TemplateEdit() {
               </div>
               <button className="btn primary" onClick={leaveSave}>Save</button>
               <button className="btn ghost mt-1" onClick={leaveDiscard}>Discard</button>
+              <button className="btn ghost mt-1" onClick={leaveCancel}>Cancel</button>
             </div>
           </div>
         )}

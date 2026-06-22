@@ -1,5 +1,7 @@
-import { Routes, Route, Navigate, useLocation, matchPath } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, matchPath, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuth } from './lib/auth.jsx';
+import { useNavGuard } from './lib/navguard.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import Login from './pages/Login.jsx';
@@ -32,6 +34,7 @@ export default function App() {
   // display:contents on mobile so the chrome is unchanged.
   return (
     <div className="app-frame">
+      <NavGuardInterceptor />
       <Sidebar />
       <main className="app-main">
         <Routes>
@@ -59,4 +62,36 @@ function ConditionalBottomNav() {
   const inSession = matchPath('/sessions/:id', loc.pathname);
   if (inSession) return null;
   return <BottomNav />;
+}
+
+// When a page registers an unsaved-changes guard, intercept clicks on
+// internal links (NavLink in the sidebar / bottom nav, in-page <a> links)
+// during the capture phase. If the click would navigate somewhere else,
+// hand it to the guard, which shows its own Save/Discard prompt and then
+// performs the navigation if the user confirms.
+function NavGuardInterceptor() {
+  const { active, runGuard } = useNavGuard();
+  const navigate = useNavigate();
+  const loc = useLocation();
+
+  useEffect(() => {
+    if (!active) return undefined;
+    function onClick(e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const anchor = e.target.closest('a[href]');
+      if (!anchor) return;
+      const url = new URL(anchor.href, window.location.origin);
+      if (url.origin !== window.location.origin) return;        // external link
+      const dest = url.pathname + url.search;
+      if (dest === loc.pathname + loc.search) return;           // same page
+      // Intercept and let the guard decide.
+      const proceed = () => navigate(dest);
+      const allow = runGuard(proceed);
+      if (!allow) { e.preventDefault(); e.stopPropagation(); }
+    }
+    document.addEventListener('click', onClick, true); // capture phase
+    return () => document.removeEventListener('click', onClick, true);
+  }, [active, runGuard, navigate, loc.pathname, loc.search]);
+
+  return null;
 }
