@@ -52,16 +52,18 @@ function WaterRing({ total, goal }) {
         {/* track */}
         <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--gray-bg)" strokeWidth="12" />
 
-        {/* water fill clipped to inner circle */}
+        {/* water fill clipped to inner circle. The wave paths are wider than
+            the view and tile on an 80px period, so a translateX of exactly
+            one period (see CSS) loops seamlessly with no jump or side gap. */}
         <g clipPath="url(#ringClip)">
           <rect x="0" y="0" width={SIZE} height={SIZE} fill="rgba(43,156,255,0.06)" />
-          {/* back wave */}
+          {/* back wave (period 80px, starts well left of the view) */}
           <path className="water-wave water-wave--back"
-                d={`M -50 ${waterTop} q 25 -12 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 V ${SIZE+20} H -50 Z`}
+                d={`M -160 ${waterTop} q 20 -10 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 V ${SIZE + 20} H -160 Z`}
                 fill="rgba(127,208,255,0.55)" />
           {/* front wave */}
           <path className="water-wave water-wave--front"
-                d={`M -50 ${waterTop} q 25 12 50 0 t 50 0 t 50 0 t 50 0 t 50 0 t 50 0 V ${SIZE+20} H -50 Z`}
+                d={`M -160 ${waterTop} q 20 10 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 V ${SIZE + 20} H -160 Z`}
                 fill="url(#waterGrad)" />
         </g>
 
