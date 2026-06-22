@@ -64,8 +64,8 @@ export default function Bodyweight() {
               </div>
             </div>
             {!showWeightForm && (
-              <button className="btn tiny" onClick={() => { setDate(todayISO()); setShowWeightForm(true); }}>
-                + Log weight
+              <button className="btn primary log-weight-btn" onClick={() => { setDate(todayISO()); setShowWeightForm(true); }}>
+                <Icon name="plus" /> Log weight
               </button>
             )}
           </div>
