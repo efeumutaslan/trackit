@@ -18,6 +18,7 @@ export default function Bodyweight() {
   const [date, setDate] = useState(todayISO);
   const [w, setW] = useState('');
   const [note, setNote] = useState('');
+  const [showWeightForm, setShowWeightForm] = useState(false);
 
   function load() {
     api.get('/bodyweight').then(setRows).catch(() => {});
@@ -29,6 +30,7 @@ export default function Bodyweight() {
     if (!Number.isFinite(parsed) || parsed <= 0) return;
     await api.post('/bodyweight', { log_date: date, weight_kg: parsed, note });
     setW(''); setNote('');
+    setShowWeightForm(false);
     load();
   }
 
@@ -38,6 +40,9 @@ export default function Bodyweight() {
     load();
   }
 
+  // Most recent entry (rows come newest-first from the API).
+  const latest = rows[0];
+
   // Mini chart — last 30 entries, oldest first
   const chartData = rows.slice(0, 30).reverse();
   const max = Math.max(...chartData.map((r) => r.weight_kg), 1);
@@ -46,31 +51,52 @@ export default function Bodyweight() {
 
   return (
     <div className="app-shell page-bodyweight">
-      <TopBar back title="Bodyweight" />
+      <TopBar back title="Body" />
       <div className="content">
         {settings?.feat_water !== 0 && <WaterTracker />}
+
         <div className="card">
-          <div className="row mb-1">
+          <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between', marginBottom: showWeightForm ? 12 : 0 }}>
             <div>
-              <label className="small" style={{ color: 'var(--ink-soft)' }}>Date</label>
-              <DateField value={date} onChange={setDate} />
+              <div className="section-title" style={{ margin: 0 }}>Bodyweight</div>
+              <div className="small text-muted">
+                {latest ? `Last: ${latest.weight_kg} kg · ${fmtDate(latest.log_date)}` : 'No entries yet'}
+              </div>
             </div>
-            <div>
-              <label className="small" style={{ color: 'var(--ink-soft)' }}>Weight (kg)</label>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={w}
-                onChange={(e) => setW(e.target.value.replace(/[^0-9.,]/g, ''))}
-                placeholder="78,5"
-              />
-            </div>
+            {!showWeightForm && (
+              <button className="btn tiny" onClick={() => { setDate(todayISO()); setShowWeightForm(true); }}>
+                + Log weight
+              </button>
+            )}
           </div>
-          <div className="field" style={{ marginBottom: 10 }}>
-            <label className="small" style={{ color: 'var(--ink-soft)' }}>Note (optional)</label>
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. morning, before breakfast" />
-          </div>
-          <button className="btn primary" onClick={add}>Save</button>
+
+          {showWeightForm && (
+            <>
+              <div className="row mb-1">
+                <div>
+                  <label className="small" style={{ color: 'var(--ink-soft)' }}>Date</label>
+                  <DateField value={date} onChange={setDate} />
+                </div>
+                <div>
+                  <label className="small" style={{ color: 'var(--ink-soft)' }}>Weight (kg)</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={w}
+                    onChange={(e) => setW(e.target.value.replace(/[^0-9.,]/g, ''))}
+                    placeholder="78,5"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="field" style={{ marginBottom: 10 }}>
+                <label className="small" style={{ color: 'var(--ink-soft)' }}>Note (optional)</label>
+                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. morning, before breakfast" />
+              </div>
+              <button className="btn primary" onClick={add}>Save</button>
+              <button className="btn ghost mt-1" onClick={() => { setShowWeightForm(false); setW(''); setNote(''); }}>Cancel</button>
+            </>
+          )}
         </div>
 
         {chartData.length >= 2 && (
